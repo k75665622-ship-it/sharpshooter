@@ -1,0 +1,25 @@
+# Runtime cache — rebuilt automatically, safe to delete by hand if you want
+data/
+
+# Logs
+*.log
+
+# Scratch output from the diagnostic scripts
+_scratch/
+board.json
+a.json
+b.json
+b2.json
+m.json
+ids.txt
+served_index.html
+served_app.js
+botd*.json
+sun.json
+m19.json
+*_check.html
+*_check.js
+*_check.css
+
+# Browser screenshots captured during UI verification
+shots/
