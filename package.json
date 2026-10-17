@@ -2,15 +2,17 @@
   "name": "sharpshooter",
   "version": "1.0.0",
   "private": true,
-  "description": "Football prediction engine — Dixon-Coles bivariate Poisson on live xG/xGA, with pattern detection, bookmaker-trap screening and a single banker pick per match.",
+  "description": "Football prediction engine \u2014 Dixon-Coles on live xG, calibrated, screened by eleven market methodologies.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "verify": "node test_crosscheck.js && node test_consensus_price.js && node test_news.js && node test_quota.js",
+    "verify": "node test_crosscheck.js && node test_consensus_price.js && node test_news.js && node test_quota.js && node test_methodology.js",
     "test:engine": "node test_engine.js",
     "test:board": "node test_board.js",
-    "test:quota": "node test_quota.js"
+    "test:quota": "node test_quota.js",
+    "test:methodology": "node test_methodology.js",
+    "backtest": "node backtest_methodology.js"
   },
   "engines": {
     "node": ">=18"
