@@ -21,8 +21,9 @@
 
   <nav class="tabs" id="tabs">
     <button class="tab is-active" data-view="matches">Matches</button>
-    <button class="tab" data-view="bankers">Bankers</button>
-    <button class="tab" data-view="daily">Banker of the Day</button>
+    <button class="tab" data-view="predictions">Predictions</button>
+    <button class="tab" data-view="top">Top Pick</button>
+    <button class="tab" data-view="method">Methodology</button>
   </nav>
 
   <div class="status" id="status">
@@ -46,7 +47,7 @@
   <div class="datelabel" id="dateLabel"></div>
   <label class="toggle">
     <input type="checkbox" id="bankersOnly" />
-    <span>Bankers only</span>
+    <span>Predicted only</span>
   </label>
   <label class="toggle">
     <input type="checkbox" id="liveRefresh" checked />
@@ -70,9 +71,9 @@
 <div class="scrim" id="scrim"></div>
 
 <footer class="foot">
-  <span>Data: ESPN public APIs — free, no key required.</span>
+  <span>Data: ESPN · openfootball (per-game history) · ClubElo — all free, no key.</span>
   <span class="sep">•</span>
-  <span>Model: Dixon-Coles bivariate Poisson on live xG/xGA.</span>
+  <span>Model: Dixon-Coles, calibrated, then screened by 11 market methodologies.</span>
   <span class="sep">•</span>
   <span class="disclaimer">Analytical output only. No outcome is guaranteed.</span>
 </footer>

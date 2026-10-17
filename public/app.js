@@ -14,7 +14,9 @@ const state = {
   board: null,
   analysis: null,      // current match report
   selectedId: null,
-  bankers: null,
+  preds: null,
+  method: null,
+  filter: { method: 'all', status: 'all' },
   bankersOnly: false,
   autoRefresh: true,
   loadingDetail: false,
@@ -92,9 +94,9 @@ function renderBoard() {
     return;
   }
 
-  const bankerMap = new Map();
-  if (state.bankers && state.bankers.bankers) {
-    for (const b of state.bankers.bankers) bankerMap.set(String(b.match.id), b);
+  const bankerMap = new Map(); // fixture id -> its strongest methodology prediction
+  if (state.preds && state.preds.headline) {
+    for (const b of state.preds.headline) bankerMap.set(String(b.match.id), b);
   }
 
   let html = '';
@@ -140,8 +142,8 @@ function renderBoard() {
       let badge = '';
       if (isLive) badge = `<span class="badge live">live</span>`;
       else if (bk) {
-        const cls = bk.banker.tier === 'Platinum' ? 'plat' : bk.banker.tier === 'Gold' ? 'gold' : 'silver';
-        badge = `<span class="badge ${cls}">★ ${esc(bk.banker.tier)} banker</span>`;
+        const sm = statusMeta(bk.prediction.status);
+        badge = `<span class="badge st-${sm.cls}" title="${esc(bk.prediction.name)}">${esc(bk.prediction.pick.label)}</span>`;
       }
 
       html += `<div class="match-row ${state.selectedId === String(m.id) ? 'is-open' : ''}" data-id="${esc(m.id)}" data-league="${esc(m.league)}" data-year="${esc(m.seasonYear || '')}">
@@ -169,8 +171,8 @@ function renderBoard() {
   }
 
   if (!shown) {
-    el.innerHTML = `<div class="empty"><h3>No banker picks qualify</h3>
-      <p>No fixture on ${esc(fmtDateLong(state.date))} cleared every gate. Try another date or untick “Bankers only”.</p></div>`;
+    el.innerHTML = `<div class="empty"><h3>No predictions qualify</h3>
+      <p>No fixture on ${esc(fmtDateLong(state.date))} fits any methodology. Try another date or untick “Predicted only”.</p></div>`;
     return;
   }
 
@@ -254,57 +256,17 @@ function renderDetail(rep) {
     </div>`;
 
   if (!rep.analysable) {
-    el.innerHTML = head + `<div class="no-banker"><strong>No prediction issued</strong>${esc(rep.reason || '')}</div>`
+    el.innerHTML = head + `<div class="no-banker"><strong>No prediction issued</strong> ${esc(rep.reason || '')}</div>`
       + newsSection(rep);
     bindDetail();
     return;
   }
 
-  el.innerHTML = head + bankerSection(rep) + modelSection(rep) + marketSection(rep)
+  el.innerHTML = head + methodologySection(rep) + modelSection(rep) + marketSection(rep)
     + patternSection(rep) + trapSection(rep) + lineMovementSection(rep)
     + h2hSection(rep) + formSection(rep) + provenanceSection(rep) + newsSection(rep);
 
   bindDetail();
-}
-
-function bankerSection(rep) {
-  const b = rep.banker;
-  if (!b) {
-    const lean = rep.lean;
-    return `<div class="sec"><div class="sec-title">Banker verdict</div>
-      <div class="no-banker"><strong>No banker issued for this fixture</strong>
-      No market cleared every gate — model confidence, trap screening, pattern alignment and price verification
-      were not all satisfied at the same time. Nothing has been forced.</div>
-      ${lean ? `<div class="lean-card">
-        <div class="lc-top"><span class="lc-tag">Lean only — not a banker</span><span class="lc-score">${lean.score}/100</span></div>
-        <div class="lc-pick">${esc(lean.label)}</div>
-        <div class="lc-meta">${esc(lean.group)} · model ${pct(lean.prob)} · ${lean.verified ? 'price ' + dec(lean.price) : 'no quoted price'}
-        ${lean.valuePct == null ? '' : ' · EV ' + (lean.valuePct > 0 ? '+' : '') + lean.valuePct.toFixed(1) + '%'}</div>
-        <div class="lc-note">${esc(lean.note)}</div>
-      </div>` : ''}
-    </div>`;
-  }
-  const tierCls = b.tier === 'Platinum' ? 'platinum' : b.tier === 'Gold' ? 'gold' : 'silver';
-  const evCls = b.valuePct == null ? '' : b.valuePct > 0 ? 'pos' : 'neg';
-  return `<div class="sec">
-    <div class="sec-title">Banker verdict <span class="pill">one market only</span></div>
-    <div class="banker-card ${tierCls}">
-      <div class="bc-top">
-        <span class="bc-tier">${esc(b.tierLabel)}</span>
-        <span class="bc-score">${b.score}<small>/100</small></span>
-      </div>
-      <div class="bc-pick">${esc(b.label)}</div>
-      <div class="bc-market">${esc(b.group)} · model probability ${pct(b.prob)}</div>
-      <div class="bc-stats">
-        <div class="bc-stat"><div class="v">${dec(b.price)}</div><div class="k">${esc(priceLabel(b))}</div></div>
-        <div class="bc-stat"><div class="v ${evCls}">${b.valuePct == null ? '—' : (b.valuePct > 0 ? '+' : '') + b.valuePct.toFixed(1) + '%'}</div><div class="k">Expected value</div></div>
-        <div class="bc-stat"><div class="v">${b.edge == null ? '—' : (b.edge > 0 ? '+' : '') + (b.edge * 100).toFixed(1) + '%'}</div><div class="k">Edge vs market</div></div>
-      </div>
-      <div class="bc-note">${esc(b.tierBlurb)} ${b.traps.length ? 'Caveats: ' + esc(b.traps.map((t) => t.label).join('; ')) + '.' : 'No caveats flagged on this market.'}</div>
-    </div>
-    ${b.alternatives && b.alternatives.length ? `<div style="margin-top:10px;font-size:11.5px;color:var(--text-3)">
-      Next-best qualifying markets: ${b.alternatives.map((a) => esc(a.label) + ' (' + (a.prob * 100).toFixed(0) + '%, score ' + a.score + ')').join(' · ')}</div>` : ''}
-  </div>`;
 }
 
 function modelSection(rep) {
@@ -565,221 +527,298 @@ function bindDetail() {
   if (btn) btn.addEventListener('click', closeDetail);
 }
 
-/* ---------------------------------------------------------- bankers view */
+/* ---------------------------------------------------------- methodology helpers */
 
-async function loadBankers(force) {
-  if (state.bankers && !force) return state.bankers;
-  setStatus('analysing the day…', 'busy');
-  state.bankers = await api(`/api/bankers?date=${encodeURIComponent(state.date)}&limit=60`);
-  setStatus(state.bankers.withBanker + ' bankers from ' + state.bankers.analysed + ' fixtures', 'ok');
-  return state.bankers;
+const STATUS_META = {
+  LOCK:    { cls: 'lock',    label: 'Lock',       blurb: 'Every gate passed and the price shows a real edge.' },
+  PREDICT: { cls: 'predict', label: 'Predict',    blurb: 'Every gate passed. No verified price edge, so check your own bookmaker.' },
+  PAPER:   { cls: 'paper',   label: 'Paper only', blurb: 'Qualifies on the data, but this market has not earned real stakes. Track it first.' },
+  WATCH:   { cls: 'watch',   label: 'Watch',      blurb: 'Close, but not enough evidence to call it.' },
+  REMOVE:  { cls: 'remove',  label: 'No',         blurb: 'Fails a hard gate or too few checks.' },
+};
+const statusMeta = (s) => STATUS_META[s] || STATUS_META.REMOVE;
+const signed = (v, dp = 1) => (v == null ? '—' : (v > 0 ? '+' : '') + v.toFixed(dp));
+
+function statusBadge(p) {
+  const m = statusMeta(p.status);
+  return `<span class="badge st-${m.cls}" title="${esc(m.blurb)}">${esc(m.label)}</span>`;
 }
 
-function renderBankers() {
-  const el = $('#board');
-  const data = state.bankers;
-  if (!data) {
-    el.innerHTML = `<div class="loading"><div class="spinner"></div><p>Running deep analysis across every fixture…</p>
-      <p style="font-size:11px;color:var(--text-3);max-width:320px;text-align:center">
-      This builds league baselines from live xG data and screens every market on every match. First run takes a moment; results are then cached.</p></div>`;
-    return;
-  }
-
-  const best = data.bankerOfTheDay;
-  let html = '';
-
-  if (best) {
-    const b = best.banker;
-    html += `<div class="banker-hero">
-      <div class="bh-kicker">★ Banker of the Day · ${esc(b.tierLabel)}</div>
-      <div class="bh-match">${esc(best.match.home.name)} vs ${esc(best.match.away.name)}</div>
-      <div class="bh-league">${esc(best.match.leagueFlag || '')} ${esc(best.match.leagueName)} · ${esc(fmtTime(best.match.date))} · ${esc(fmtDateLong(best.match.date.slice(0, 10)))}</div>
-      <div class="bh-pick"><span class="p">${esc(b.label)}</span><span class="pr">${dec(b.price)}</span></div>
-      <div class="bh-grid">
-        <div class="bh-cell"><div class="v">${b.score}</div><div class="k">Sharpshooter</div></div>
-        <div class="bh-cell"><div class="v">${pct(b.prob)}</div><div class="k">Probability</div></div>
-        <div class="bh-cell"><div class="v">${b.valuePct == null ? '—' : (b.valuePct > 0 ? '+' : '') + b.valuePct.toFixed(1) + '%'}</div><div class="k">Expected value</div></div>
-        <div class="bh-cell"><div class="v">${esc(b.tier)}</div><div class="k">Tier</div></div>
-      </div>
-    </div>`;
-  }
-
-  if (!data.bankers.length) {
-    html += `<div class="empty"><h3>No banker qualified today</h3>
-      <p>Every market on every fixture failed at least one gate. That is the correct output — no forced picks.</p></div>`;
-  } else {
-    html += `<div class="sec-title">All qualifying bankers <span class="pill">${data.bankers.length}</span></div>
-      <div class="banker-grid">`;
-
-    for (const item of data.bankers) {
-      const b = item.banker;
-      const cls = b.tier === 'Platinum' ? 'plat' : b.tier === 'Gold' ? 'gold' : 'silver';
-      html += `<div class="bcard" data-id="${esc(item.match.id)}" data-league="${esc(item.match.league)}" data-year="${esc(item.match.seasonYear || '')}">
-        <div class="bcard-top">
-          <span class="bcard-league">${esc(item.match.leagueFlag || '')} ${esc(item.match.leagueName)}</span>
-          <span class="badge ${cls}">${esc(b.tier)}</span>
-          <span class="bcard-score">${b.score}</span>
-        </div>
-        <div class="bcard-match">${esc(item.match.home.name)} vs ${esc(item.match.away.name)}</div>
-        <div class="bcard-pick">
-          <div class="p">${esc(b.label)}</div>
-          <div class="m">${esc(b.group)} · ${esc(fmtTime(item.match.date))}</div>
-        </div>
-        <div class="bcard-stats">
-          <span>Prob <b>${pct(b.prob)}</b></span>
-          <span>Price <b>${dec(b.price)}</b></span>
-          <span>EV <b>${b.valuePct == null ? '—' : (b.valuePct > 0 ? '+' : '') + b.valuePct.toFixed(1) + '%'}</b></span>
-        </div>
-        ${(b.traps && b.traps.length) ? `<div class="bcard-caveats">
-          <span class="bcc-label">Caveats</span>
-          ${b.traps.slice(0, 4).map((t) => `<span class="bcc sev-${esc(t.severity)}" title="${esc(t.detail || '')}">${esc(t.label)}</span>`).join('')}
-        </div>` : ''}
-      </div>`;
-    }
-    html += `</div>`;
-  }
-
-  // ---- Leans: near-misses, explicitly separated from bankers ----
-  if (data.leans && data.leans.length) {
-    html += `<div class="sec-title" style="margin-top:26px">Best leans
-      <span class="pill">near-misses · not bankers</span></div>
-      <p style="font-size:12px;color:var(--text-3);margin:-2px 0 12px">
-        These did <strong>not</strong> clear every gate. They are shown for transparency only —
-        treat them as weaker than any banker above.</p>
-      <div class="banker-grid">`;
-    for (const item of data.leans.slice(0, 12)) {
-      const l = item.lean;
-      html += `<div class="bcard" data-id="${esc(item.match.id)}" data-league="${esc(item.match.league)}" data-year="${esc(item.match.seasonYear || '')}">
-        <div class="bcard-top">
-          <span class="bcard-league">${esc(item.match.leagueFlag || '')} ${esc(item.match.leagueName)}</span>
-          <span class="badge none">lean</span>
-          <span class="bcard-score">${l.score}</span>
-        </div>
-        <div class="bcard-match">${esc(item.match.home.name)} vs ${esc(item.match.away.name)}</div>
-        <div class="bcard-pick lean">
-          <div class="p">${esc(l.label)}</div>
-          <div class="m">${esc(l.group)} · ${pct(l.prob)} · ${esc(fmtTime(item.match.date))}</div>
-        </div>
-        <div class="bcard-stats">
-          <span>Prob <b>${pct(l.prob)}</b></span>
-          <span>${l.verified ? 'Price <b>' + dec(l.price) + '</b>' : 'no quoted price'}</span>
-        </div>
-      </div>`;
-    }
-    html += `</div>`;
-  }
-
-  el.innerHTML = html;
-
-  $$('.bcard', el).forEach((c) => {
-    c.addEventListener('click', () => openMatch(c.dataset.id, c.dataset.league, c.dataset.year));
-  });
+function priceLine(p) {
+  const pr = p.price || {};
+  if (pr.state === 'edge') return `<b>${dec(pr.price)}</b> · edge ${dec(pr.ratio)}x`;
+  if (pr.price) return `<b>${dec(pr.price)}</b> · ${esc(pr.state === 'too-short' ? 'too short' : 'no edge')}`;
+  return `fair <b>${dec(p.fairOdds)}</b> · no quote`;
 }
 
-/* ---------------------------------------------------------- daily view */
-
-/* ---------------------------------------------------- caveats & provenance */
-
-/**
- * The caveats attached to an elected banker.
- *
- * A banker is only trustworthy if its weaknesses are stated next to it. This
- * renders, in order of severity: every trap that survived screening, the
- * team-news read, and any data-provenance gap (no xG, thin sample).
- */
-function caveatBlock(b, rep) {
-  if (!b) return '';
-  const traps = (b.traps || []).slice().sort((a, c) => {
-    const R = { veto: 4, high: 3, medium: 2, info: 1 };
-    return (R[c.severity] || 0) - (R[a.severity] || 0);
-  });
-
-  const pv = rep && rep.dataProvenance;
-  const prov = [];
-  if (pv) {
-    if (!pv.hasXg) prov.push('No xG published for these teams — the model fell back to goals-based ratings, which are less predictive.');
-    if (pv.statsSample && Math.min(pv.statsSample.home, pv.statsSample.away) < 6) {
-      prov.push(`Thin sample: ${pv.statsSample.home} and ${pv.statsSample.away} games played. Ratings are heavily shrunk toward the league mean.`);
-    }
-  }
-
-  const newsNotes = (rep && rep.verdict && rep.verdict.newsNotes) || [];
-  const nr = rep && rep.newsRisk;
-  const newsItems = nr ? [...(nr.home.items || []), ...(nr.away.items || [])] : [];
-
-  if (!traps.length && !prov.length && !newsNotes.length && !newsItems.length) return '';
-
-  return `<div class="caveats">
-    <div class="cv-title">Caveats — read before acting</div>
-    ${traps.map((t) => `<div class="cv-row sev-${esc(t.severity)}">
-      <span class="cv-dot"></span>
-      <span class="cv-body"><b>${esc(t.label)}</b> ${esc(t.detail || '')}</span>
-    </div>`).join('')}
-    ${newsItems.map((n) => `<div class="cv-row sev-${esc(n.severity)}">
-      <span class="cv-dot"></span>
-      <span class="cv-body"><b>Team news · ${esc(n.label)}</b> ${esc(n.headline)}${n.published ? ' <i>(' + esc(n.published) + ')</i>' : ''}</span>
-    </div>`).join('')}
-    ${!newsItems.length && newsNotes.length ? `<div class="cv-row sev-info">
-      <span class="cv-dot"></span>
-      <span class="cv-body"><b>Team news</b> ${esc(newsNotes.join(' '))}</span>
-    </div>` : ''}
-    ${prov.map((p) => `<div class="cv-row sev-medium">
-      <span class="cv-dot"></span>
-      <span class="cv-body"><b>Data quality</b> ${esc(p)}</span>
-    </div>`).join('')}
+function predCard(item, withMethod) {
+  const p = item.prediction;
+  const m = item.match;
+  const why = (p.support && p.support[0]) || '';
+  return `<div class="pcard st-${statusMeta(p.status).cls}" data-id="${esc(m.id)}" data-league="${esc(m.league)}" data-year="${esc(m.seasonYear || '')}">
+    <div class="pc-top">
+      <span class="pc-league">${esc(m.leagueFlag || '')} ${esc(m.leagueName)} · ${esc(fmtTime(m.date))}</span>
+      ${statusBadge(p)}
+      <span class="pc-score" title="Methodology score, 0–100">${p.score}</span>
+    </div>
+    <div class="pc-match">${esc(m.home.name)} <span>vs</span> ${esc(m.away.name)}</div>
+    <div class="pc-pick">${esc(p.pick.label)}</div>
+    ${withMethod ? `<div class="pc-method">${esc(p.name)} · v${esc(p.version)}</div>` : ''}
+    <div class="pc-stats">
+      <span>Prob <b>${pct(p.prob, 0)}</b></span>
+      <span>${priceLine(p)}</span>
+      <span>Checks <b>${p.checklist.passed}/${p.checklist.known}</b></span>
+    </div>
+    ${why ? `<div class="pc-why">${esc(why)}</div>` : ''}
+    ${p.paperOnly ? `<div class="pc-paper">Paper only: log it, do not stake.</div>` : ''}
+    ${p.flags && p.flags.length ? `<div class="pc-flags">${p.flags.slice(0, 2).map((f) => `<span>${esc(f)}</span>`).join('')}</div>` : ''}
   </div>`;
 }
 
-function renderDaily() {
-  const el = $('#board');
-  const data = state.bankers;
-  if (!data) {
-    el.innerHTML = `<div class="loading"><div class="spinner"></div><p>Selecting the banker of the day…</p></div>`;
-    return;
-  }
-  const best = data.bankerOfTheDay;
-  if (!best) {
-    el.innerHTML = `<div class="empty"><h3>No banker of the day</h3>
-      <p>No fixture on ${esc(fmtDateLong(state.date))} produced a market that cleared every gate.</p></div>`;
-    return;
-  }
-  const b = best.banker;
-  const m = best.match;
-  el.innerHTML = `<div class="banker-hero">
-      <div class="bh-kicker">★ Banker of the Day · ${esc(b.tierLabel)}</div>
-      <div class="bh-match">${esc(m.home.name)} vs ${esc(m.away.name)}</div>
-      <div class="bh-league">${esc(m.leagueFlag || '')} ${esc(m.leagueName)} · ${esc(fmtTime(m.date))} · ${esc(fmtDateLong(m.date.slice(0, 10)))}</div>
-      <div class="bh-pick"><span class="p">${esc(b.label)}</span><span class="pr">${dec(b.price)}</span></div>
-      <div class="bh-grid">
-        <div class="bh-cell"><div class="v">${b.score}</div><div class="k">Sharpshooter</div></div>
-        <div class="bh-cell"><div class="v">${pct(b.prob)}</div><div class="k">Probability</div></div>
-        <div class="bh-cell"><div class="v">${dec(b.fairOdds)}</div><div class="k">Fair odds</div></div>
-        <div class="bh-cell"><div class="v">${b.edge == null ? '—' : (b.edge > 0 ? '+' : '') + (b.edge * 100).toFixed(1) + '%'}</div><div class="k">Edge</div></div>
-        <div class="bh-cell"><div class="v">${b.valuePct == null ? '—' : (b.valuePct > 0 ? '+' : '') + b.valuePct.toFixed(1) + '%'}</div><div class="k">EV</div></div>
-      </div>
-      <div style="margin-top:14px;font-size:12.5px;line-height:1.65">
-        <strong>Why this one:</strong> ${esc(best.verdict ? best.verdict.summary : '')}
-      </div>
-      ${caveatBlock(b, best)}
-    </div>
-    <div class="sec-title">Runner-up bankers <span class="pill">${Math.max(0, data.bankers.length - 1)}</span></div>
-    <div class="banker-grid">
-    ${data.bankers.slice(1, 7).map((item) => {
-      const bb = item.banker;
-      return `<div class="bcard" data-id="${esc(item.match.id)}" data-league="${esc(item.match.league)}" data-year="${esc(item.match.seasonYear || '')}">
-        <div class="bcard-top">
-          <span class="bcard-league">${esc(item.match.leagueName)}</span>
-          <span class="bcard-score">${bb.score}</span>
-        </div>
-        <div class="bcard-match">${esc(item.match.home.name)} vs ${esc(item.match.away.name)}</div>
-        <div class="bcard-pick"><div class="p">${esc(bb.label)}</div><div class="m">${esc(bb.group)} · ${pct(bb.prob)}</div></div>
-      </div>`;
-    }).join('')}
-    </div>`;
-
-  $$('.bcard', el).forEach((c) => {
+function bindCards(el) {
+  $$('.pcard, .bcard', el).forEach((c) => {
     c.addEventListener('click', () => openMatch(c.dataset.id, c.dataset.league, c.dataset.year));
   });
+}
+
+function loadingBlock(msg, sub) {
+  return `<div class="loading"><div class="spinner"></div><p>${esc(msg)}</p>
+    ${sub ? `<p style="font-size:11px;max-width:340px;text-align:center;color:var(--text-3)">${esc(sub)}</p>` : ''}</div>`;
+}
+
+/* ---------------------------------------------------------- detail: methodology verdicts */
+
+function gateList(gates) {
+  return (gates || []).map((g) => `<div class="gt ${g.unknown ? 'unk' : g.pass ? 'ok' : 'no'}">
+    <span class="gt-i">${g.unknown ? '?' : g.pass ? '✓' : '✕'}</span>
+    <span class="gt-b"><b>${esc(g.label)}</b><br><span>${g.value != null ? esc(String(g.value)) : 'no data'}${g.need ? ' · needs ' + esc(String(g.need)) : ''}${g.unknown ? ' · unknown, so it fails' : ''}</span></span>
+  </div>`).join('');
+}
+
+function checkList(items) {
+  return (items || []).map((c) => `<div class="ck ${c.unknown ? 'unk' : c.score >= 0.5 ? 'ok' : 'no'}">
+    <span class="ck-i">${c.unknown ? '?' : c.score >= 0.5 ? '✓' : '✕'}</span>
+    <span class="ck-b"><b>${esc(c.label)}</b>${c.value != null ? ' <em>' + esc(String(c.value)) + '</em>' : ''}${c.note ? '<br><span>' + esc(c.note) + '</span>' : ''}</span>
+  </div>`).join('');
+}
+
+function methodologySection(rep) {
+  const mt = rep.methodology;
+  if (!mt || mt.error) {
+    return `<div class="sec"><div class="sec-title">Methodology verdicts</div>
+      <div class="no-banker"><strong>Methodology layer unavailable</strong>${esc(mt && mt.error ? mt.error : 'No methodology data for this fixture.')}</div></div>`;
+  }
+  const h = mt.headline;
+  const cov = mt.coverage || {};
+  let html = `<div class="sec"><div class="sec-title">Methodology verdict <span class="pill">${mt.predictions.length} of ${mt.all.length} fit</span></div>`;
+
+  if (!h) {
+    html += `<div class="no-banker"><strong>No market qualifies</strong>
+      This match does not fall under any of the eleven methodologies. Nothing has been forced.</div>`;
+  } else {
+    const m = statusMeta(h.status);
+    html += `<div class="verdict st-${m.cls}">
+      <div class="v-top"><span class="v-tag">${esc(m.label)} · ${esc(h.tier)}</span><span class="v-score">${h.score}<small>/100</small></span></div>
+      <div class="v-pick">${esc(h.pick.label)}</div>
+      <div class="v-sub">${esc(h.name)} · model ${pct(h.prob)} (calibrated) · fair odds ${dec(h.fairOdds)}</div>
+      <div class="v-stats">
+        <div><div class="v">${pct(h.prob, 0)}</div><div class="k">Probability</div></div>
+        <div><div class="v">${h.price && h.price.price ? dec(h.price.price) : '—'}</div><div class="k">${h.price && h.price.price ? 'Book price' : 'No quote'}</div></div>
+        <div><div class="v">${h.checklist.passed}/${h.checklist.known}</div><div class="k">Checks passed</div></div>
+      </div>
+      <div class="v-note">${esc(m.blurb)} ${h.price && h.price.note ? esc(h.price.note) : ''}</div>
+      ${h.paperOnly ? `<div class="v-paper">Paper only: record the result, do not stake real money until the sample proves it.${h.stake ? ' If tracking, ' + esc(h.stake) + '.' : ''}</div>` : ''}
+    </div>`;
+    const others = mt.predictions.filter((p) => p.id !== h.id);
+    if (others.length) {
+      html += `<div class="v-others"><b>Also qualifies:</b> ${others.map((p) => `${esc(p.pick.label)} <i>(${esc(statusMeta(p.status).label)}, ${pct(p.prob, 0)})</i>`).join(' · ')}</div>`;
+    }
+  }
+  if (mt.dropped && mt.dropped.length) {
+    html += `<div class="v-dropped">${mt.dropped.map((d) => `Set aside <b>${esc(d.pick)}</b>: ${esc(d.reason)}`).join('<br>')}</div>`;
+  }
+  const lowCov = [];
+  if (!cov.history) lowCov.push('no per-game history for this league, so evidence uses ESPN form only');
+  if (!cov.elo) lowCov.push('no Elo rating found, so the independent-witness check is waived');
+  if (lowCov.length) html += `<div class="src-note">Data note: ${esc(lowCov.join('; '))}.</div>`;
+  html += `</div>`;
+
+  // every methodology, with its gates and checklist on demand
+  html += `<div class="sec"><div class="sec-title">All eleven methodologies <span class="pill">tap to inspect</span></div>`;
+  for (const r of mt.all) {
+    const m = statusMeta(r.status);
+    html += `<details class="mrow st-${m.cls}">
+      <summary>
+        <span class="mr-name">${esc(r.name)}</span>
+        <span class="mr-pick">${esc(r.pick.label)}</span>
+        <span class="badge st-${m.cls}">${esc(m.label)}</span>
+        <span class="mr-prob">${r.prob == null ? '—' : pct(r.prob, 0)}</span>
+      </summary>
+      <div class="mbody">
+        ${r.failedGates && r.failedGates.length ? `<div class="mfail">Failed hard gate: ${esc(r.failedGates.join(', '))}</div>` : ''}
+        <div class="mh">Hard gates</div>${gateList(r.gates)}
+        <div class="mh">Checklist <span>${r.checklist.passed}/${r.checklist.known} passed · needs ${Math.round(r.checklist.need * 100)}%${r.checklist.thin ? ' · too few known items' : ''}</span></div>${checkList(r.checklist.items)}
+        ${r.failure && r.failure.length ? `<div class="mh">Why it could lose</div>${r.failure.map((f) => `<div class="mnote">${esc(f)}</div>`).join('')}` : ''}
+        ${r.flags && r.flags.length ? `<div class="mh">Flags</div>${r.flags.map((f) => `<div class="mnote">${esc(f)}</div>`).join('')}` : ''}
+      </div>
+    </details>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+/* ---------------------------------------------------------- predictions view */
+
+async function loadPredictions(force) {
+  if (state.preds && !force && state.preds.date === state.date) return state.preds;
+  setStatus('analysing the day…', 'busy');
+  state.preds = await api(`/api/predictions?date=${encodeURIComponent(state.date)}&limit=60`);
+  setStatus(`${state.preds.predicted} predictions from ${state.preds.analysable} fixtures`, 'ok');
+  return state.preds;
+}
+
+function summaryStrip(d) {
+  const sc = d.statusCounts || {};
+  const chip = (k, n, lab) => `<div class="ss-cell st-${k}"><div class="v">${n}</div><div class="k">${lab}</div></div>`;
+  return `<div class="sumstrip">
+    ${chip('lock', sc.LOCK || 0, 'Lock')}${chip('predict', sc.PREDICT || 0, 'Predict')}${chip('paper', sc.PAPER || 0, 'Paper only')}
+    <div class="ss-cell"><div class="v">${d.analysable}</div><div class="k">Fixtures analysed</div></div>
+    <div class="ss-cell"><div class="v">${d.skipped}</div><div class="k">No market fits</div></div>
+    <div class="ss-cell small"><div class="k">Per-game history ${d.coverage.withHistory}/${d.analysable}<br>Elo ${d.coverage.withElo}/${d.analysable}</div></div>
+  </div>`;
+}
+
+function renderPredictions() {
+  const el = $('#board');
+  const d = state.preds;
+  if (!d) { el.innerHTML = loadingBlock('Running every methodology on every fixture…', 'Builds history and Elo evidence per match, then screens eleven markets. First run takes a moment.'); return; }
+
+  const f = state.filter;
+  let html = summaryStrip(d);
+
+  if (!d.predicted) {
+    el.innerHTML = html + `<div class="empty"><h3>No fixture qualifies</h3>
+      <p>Nothing on ${esc(fmtDateLong(state.date))} cleared the gates of any methodology. That is a valid result, since predictions are never forced.</p></div>`;
+    return;
+  }
+
+  html += `<div class="filters">
+    <button class="fchip ${f.method === 'all' ? 'is-active' : ''}" data-m="all">All markets <b>${d.predicted}</b></button>
+    ${d.methods.filter((m) => m.count).map((m) => `<button class="fchip ${f.method === m.id ? 'is-active' : ''}" data-m="${esc(m.id)}">${esc(m.name)} <b>${m.count}</b></button>`).join('')}
+  </div>
+  <div class="filters sub">
+    ${['all', 'LOCK', 'PREDICT', 'PAPER'].map((s) => `<button class="fchip ${f.status === s ? 'is-active' : ''}" data-s="${s}">${s === 'all' ? 'Any status' : statusMeta(s).label}</button>`).join('')}
+  </div>`;
+
+  const keep = (it) => f.status === 'all' || it.prediction.status === f.status;
+  let shown = 0;
+  if (f.method === 'all') {
+    const list = d.headline.filter(keep);
+    shown = list.length;
+    html += `<div class="sec-title">Strongest prediction per fixture <span class="pill">${list.length}</span></div>
+      <div class="pgrid">${list.map((it) => predCard(it, true)).join('')}</div>`;
+  } else {
+    const list = (d.byMethod[f.method] || []).filter(keep);
+    shown = list.length;
+    const meta = d.methods.find((m) => m.id === f.method);
+    html += `<div class="sec-title">${esc(meta ? meta.name : f.method)} <span class="pill">${list.length}</span></div>
+      <div class="pgrid">${list.map((it) => predCard(it, false)).join('')}</div>`;
+  }
+  if (!shown) html += `<div class="empty"><h3>Nothing matches this filter</h3><p>Try “Any status” or another market.</p></div>`;
+
+  el.innerHTML = html;
+  $$('.fchip', el).forEach((b) => b.addEventListener('click', () => {
+    if (b.dataset.m) state.filter.method = b.dataset.m;
+    if (b.dataset.s) state.filter.status = b.dataset.s;
+    renderPredictions();
+  }));
+  bindCards(el);
+}
+
+/* ---------------------------------------------------------- top pick view */
+
+function renderTop() {
+  const el = $('#board');
+  const d = state.preds;
+  if (!d) { el.innerHTML = loadingBlock('Selecting the top pick…'); return; }
+  const ranked = d.headline;
+  if (!ranked.length) {
+    el.innerHTML = `<div class="empty"><h3>No top pick</h3>
+      <p>No fixture on ${esc(fmtDateLong(state.date))} qualifies under any methodology.</p></div>`;
+    return;
+  }
+  const best = ranked[0];
+  const p = best.prediction;
+  const m = best.match;
+  const sm = statusMeta(p.status);
+  const downside = [...(p.failure || []), ...(p.flags || [])];
+  el.innerHTML = `<div class="top-hero st-${sm.cls}">
+      <div class="th-kicker">★ Top pick · ${esc(sm.label)} · ${esc(p.tier)}</div>
+      <div class="th-match">${esc(m.home.name)} vs ${esc(m.away.name)}</div>
+      <div class="th-league">${esc(m.leagueFlag || '')} ${esc(m.leagueName)} · ${esc(fmtTime(m.date))} · ${esc(fmtDateLong(m.date.slice(0, 10)))}</div>
+      <div class="th-pick"><span>${esc(p.pick.label)}</span><em>${esc(p.name)}</em></div>
+      <div class="th-grid">
+        <div><div class="v">${p.score}</div><div class="k">Score</div></div>
+        <div><div class="v">${pct(p.prob)}</div><div class="k">Probability</div></div>
+        <div><div class="v">${dec(p.fairOdds)}</div><div class="k">Fair odds</div></div>
+        <div><div class="v">${p.price && p.price.price ? dec(p.price.price) : '—'}</div><div class="k">${p.price && p.price.price ? 'Book price' : 'No quote'}</div></div>
+        <div><div class="v">${p.checklist.passed}/${p.checklist.known}</div><div class="k">Checks</div></div>
+      </div>
+      ${p.support && p.support.length ? `<div class="th-h">Why it qualifies</div><ul class="th-list ok">${p.support.slice(0, 6).map((s) => `<li>${esc(s)}</li>`).join('')}</ul>` : ''}
+      ${downside.length ? `<div class="th-h">How it could lose</div><ul class="th-list no">${downside.slice(0, 6).map((s) => `<li>${esc(s)}</li>`).join('')}</ul>` : ''}
+      <div class="th-foot">${esc(sm.blurb)}${p.price && p.price.note ? ' ' + esc(p.price.note) : ''}</div>
+      <button class="th-open pcard" data-id="${esc(m.id)}" data-league="${esc(m.league)}" data-year="${esc(m.seasonYear || '')}">Open full methodology breakdown →</button>
+    </div>
+    <div class="sec-title" style="margin-top:22px">Next strongest <span class="pill">${Math.min(6, ranked.length - 1)}</span></div>
+    <div class="pgrid">${ranked.slice(1, 7).map((it) => predCard(it, true)).join('')}</div>`;
+  bindCards(el);
+}
+
+/* ---------------------------------------------------------- methodology view */
+
+async function renderMethod() {
+  const el = $('#board');
+  el.innerHTML = loadingBlock('Loading methodologies…');
+  try {
+    if (!state.method) state.method = await api('/api/methodology');
+  } catch (err) {
+    el.innerHTML = `<div class="err-box"><strong>Could not load methodologies</strong><br>${esc(err.message)}</div>`;
+    return;
+  }
+  const d = state.method;
+  const c = d.config || {};
+  const fam = {};
+  for (const m of d.methods) (fam[m.family] = fam[m.family] || []).push(m);
+  el.innerHTML = `<div class="m-intro">
+      <h2>How predictions are made</h2>
+      <p>Every fixture is run through <b>${d.methods.length} market methodologies</b>. A methodology only speaks when the match
+      genuinely falls under it: all hard gates must pass (unknown evidence counts as a fail), then at least
+      <b>${Math.round((c.qualify || 0.85) * 100)}%</b> of its checklist must pass. Where two qualifying picks contradict, the weaker is set aside.</p>
+      <div class="ladder">
+        ${['LOCK', 'PREDICT', 'PAPER', 'WATCH', 'REMOVE'].map((s) => `<div class="lad st-${statusMeta(s).cls}"><b>${statusMeta(s).label}</b><span>${esc(statusMeta(s).blurb)}</span></div>`).join('')}
+      </div>
+    </div>
+    <div class="sec-title">The methodologies <span class="pill">${d.methods.length}</span></div>
+    <div class="mgrid">${d.methods.map((m) => `<div class="mcard">
+      <div class="mc-top"><b>${esc(m.name)}</b><span>v${esc(m.version)}</span></div>
+      <div class="mc-fam">${esc(m.family)}</div>
+      <div class="mc-stats">
+        <span>Probability floor <b>${m.floor != null ? pct(m.floor, 0) : '—'}</b></span>
+        <span>Sample <b>≥ ${m.minSample}</b></span>
+        ${m.paperOnly ? '<span class="mc-paper">Paper only</span>' : ''}
+        ${m.maxLegs ? `<span>Max legs <b>${m.maxLegs}</b></span>` : ''}
+      </div></div>`).join('')}</div>
+    <div class="m-honest">
+      <h3>What the evidence says</h3>
+      <ul>
+        <li><b>Probabilities are calibrated.</b> Goal-market probabilities are recalibrated on 2023–24 results and checked on held-out 2025 matches. Stated 66.8% hit 66.5% in testing.</li>
+        <li><b>Draw is paper only.</b> In the walk-forward backtest the draw model had no predictive value, so it never produces a stake-worthy pick.</li>
+        <li><b>The gates add real value for BTTS</b> and little for Over/Under 2.5. They are kept because they stop obviously bad spots.</li>
+        <li><b>GG/NG 2+ stays on paper</b> until 40 tracked legs prove it. It cannot be tested from results alone.</li>
+        <li><b>Price edge is untested.</b> There is no free historical odds feed, so profit is not proven. Use fair odds as a guide and compare with your own bookmaker.</li>
+        <li><b>No outcome is guaranteed.</b> Analytical output only.</li>
+      </ul>
+    </div>`;
 }
 
 /* ---------------------------------------------------------- orchestration */
@@ -790,10 +829,10 @@ async function loadBoard() {
     state.board = await api(`/api/matches?date=${encodeURIComponent(state.date)}`);
     setStatus(`${state.board.totalMatches} fixtures · ${state.board.totalLeagues} competitions`, 'ok');
     renderBoard();
-    // Banker badges need the day's deep analysis. Load it in the background so
-    // the fixture list stays fast, then re-render once the badges are known.
-    if (!state.bankers) {
-      loadBankers()
+    // Prediction badges need the day's deep analysis. Load it in the background
+    // so the fixture list stays fast, then re-render once the badges are known.
+    if (!state.preds) {
+      loadPredictions()
         .then(() => { if (state.view === 'matches') renderBoard(); })
         .catch(() => { /* badges are a progressive enhancement */ });
     }
@@ -803,18 +842,20 @@ async function loadBoard() {
   }
 }
 
+function renderPredView() {
+  if (state.view === 'predictions') renderPredictions();
+  else if (state.view === 'top') renderTop();
+}
+
 async function refresh() {
-  if (state.view === 'matches') {
-    await loadBoard();
-  } else {
-    try {
-      await loadBankers(true);
-      if (state.view === 'bankers') renderBankers();
-      else renderDaily();
-    } catch (err) {
-      $('#board').innerHTML = `<div class="err-box"><strong>Analysis failed</strong><br>${esc(err.message)}</div>`;
-      setStatus('error', 'err');
-    }
+  if (state.view === 'matches') return loadBoard();
+  if (state.view === 'method') return renderMethod();
+  try {
+    await loadPredictions(true);
+    renderPredView();
+  } catch (err) {
+    $('#board').innerHTML = `<div class="err-box"><strong>Analysis failed</strong><br>${esc(err.message)}</div>`;
+    setStatus('error', 'err');
   }
 }
 
@@ -822,24 +863,23 @@ function setView(view) {
   state.view = view;
   $$('.tab').forEach((t) => t.classList.toggle('is-active', t.dataset.view === view));
   $('#bankersOnly').parentElement.style.display = view === 'matches' ? '' : 'none';
+  $('.datebar').classList.toggle('is-muted', view === 'method');
 
-  if (view === 'matches') { loadBoard(); }
-  else {
-    $('#board').innerHTML = `<div class="loading"><div class="spinner"></div><p>Running deep analysis across every fixture…</p>
-      <p style="font-size:11px;color:var(--text-3);max-width:320px;text-align:center">
-      Building league baselines from live xG data and screening every market on every match.</p></div>`;
-    loadBankers(state.bankers ? state.bankers.date !== state.date : true)
-      .then(() => (view === 'bankers' ? renderBankers() : renderDaily()))
-      .catch((err) => {
-        $('#board').innerHTML = `<div class="err-box"><strong>Analysis failed</strong><br>${esc(err.message)}</div>`;
-        setStatus('error', 'err');
-      });
-  }
+  if (view === 'matches') { loadBoard(); return; }
+  if (view === 'method') { renderMethod(); return; }
+
+  renderPredView(); // shows the loading block until data arrives
+  loadPredictions(false)
+    .then(() => { if (state.view === view) renderPredView(); })
+    .catch((err) => {
+      $('#board').innerHTML = `<div class="err-box"><strong>Analysis failed</strong><br>${esc(err.message)}</div>`;
+      setStatus('error', 'err');
+    });
 }
 
 function setDate(iso) {
   state.date = iso;
-  state.bankers = null;
+  state.preds = null;
   state.selectedId = null;
   closeDetail();
   $('#dateInput').value = iso;
@@ -865,8 +905,8 @@ function init() {
 
   $('#bankersOnly').addEventListener('change', (e) => {
     state.bankersOnly = e.target.checked;
-    if (state.bankersOnly && !state.bankers) {
-      loadBankers().then(() => renderBoard()).catch(() => renderBoard());
+    if (state.bankersOnly && !state.preds) {
+      loadPredictions().then(() => renderBoard()).catch(() => renderBoard());
     } else {
       renderBoard();
     }

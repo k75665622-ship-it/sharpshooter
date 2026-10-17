@@ -4,8 +4,10 @@ A football prediction engine that runs on **live data from free, key-less APIs**
 
 It builds a Dixon-Coles bivariate Poisson model from real expected-goals data,  
 detects visible *and* hidden patterns, screens every market against a set of  
-bookmaker-trap gates, and then elects **exactly one banker market per match** —  
-the single safest market that cleared every stage.
+bookmaker-trap gates, and then runs the match through **eleven market  
+methodologies** (Over/Under 2.5, BTTS Yes/No, GG/NG 2+, Team Total Goals, Home Win,  
+Draw, Away Win, Underdog Handicap +, Favourite Handicap −). A match is only  
+predicted in a market it genuinely falls under. See [METHODOLOGY.md](METHODOLOGY.md).
 
 ---
 
@@ -28,7 +30,8 @@ built-in `http` server and global `fetch`. Requires Node 18+ (for global `fetch`
 To run the checks:
 
 ```bash
-npm run verify     # cross-check + consensus mapping + news + quota (offline-safe)
+npm run verify            # all offline checks, including the methodology suite
+npm run backtest          # walk-forward backtest on openfootball results (needs network)
 ```
 
 ---
@@ -43,6 +46,9 @@ npm run verify     # cross-check + consensus mapping + news + quota (offline-saf
 | 4 | `sports.core.api.espn.com/.../leagues/{league}/seasons/{year}/teams` | League team lists, used to build scoring baselines                                            |
 | 5 | `api.infersports.dev/v1/events?date=YYYY-MM-DD`                      | Fixture list across ~70 competitions (keyless)                                                |
 | 6 | `api.infersports.dev/v1/events/{id}/odds?format=decimal`             | **Asian handicap + totals at multiple lines, 1x2, half-time**, from ~6 Asian books + Pinnacle  |
+
+| 7 | `raw.githubusercontent.com/openfootball/{country}/...`               | **Per-game results** (free, no key) for England 1–2, Germany 1–2, Spain 1–2, Italy 1–2, Austria 1 |
+| 8 | `api.clubelo.com/{date}`                                             | **Club Elo ratings**, used only as an independent second opinion                              |
 
 **54 competitions** are registered. The daily board polls **31 core competitions**;
 the full registry is used to resolve cup teams back to their domestic leagues.
@@ -352,7 +358,11 @@ is paid, and the card says so explicitly rather than implying unearned edge.
 
 ---
 
-## Banker election
+## Banker election (legacy)
+
+> Superseded by the methodology layer (`/api/predictions`). The banker is still
+> computed and served at `/api/bankers` for compatibility, but the website no
+> longer uses it.
 
 A market becomes the banker only if it clears **all** of:
 
@@ -440,7 +450,9 @@ the distortion but does not eliminate the extra uncertainty.
 | `GET /api/leagues`                       | Full league registry                          |
 | `GET /api/matches?date=YYYY-MM-DD`       | Fixture board (fast, no deep analysis)        |
 | `GET /api/analysis?league=&event=&year=` | Full deep report for one match                |
-| `GET /api/bankers?date=&limit=`          | Analyse the day, return bankers **and leans** |
+| `GET /api/predictions?date=&limit=`      | Methodology predictions for the day, grouped by market |
+| `GET /api/methodology`                   | The eleven methodologies and their thresholds |
+| `GET /api/bankers?date=&limit=`          | Legacy banker election (superseded)           |
 
 ---
 
@@ -455,7 +467,13 @@ sharpshooter/
 │   ├── model.js        odds maths, Poisson, Dixon-Coles, market derivation
 │   ├── analysis.js     baselines, normalising, context, team index
 │   ├── signals.js      patterns, trap gates, sharpshooter scoring
-│   └── engine.js       orchestration + banker election
+│   ├── history.js      free per-game results (openfootball)
+│   ├── elo.js          ClubElo ratings
+│   ├── methodology/    core framework + the eleven market methodologies
+│   └── engine.js       orchestration + methodology layer + legacy banker
+├── METHODOLOGY.md      reference for all eleven methodologies
+├── backtest_methodology.js  walk-forward backtest
+├── test_methodology.js      methodology checks
 ├── public/             front-end (vanilla JS, no build step)
 └── data/               disk cache (auto-created)
 ```
@@ -537,5 +555,12 @@ behaviour. If you want more picks, the `lean` tier is where they live.
   which is why unquoted markets are barred from banker election.
 - **Early season is noisy.** With four games played, ratings are shrunk hard  
   toward the mean. The model reports its own sample size and flags it.
+- **Price edge is untested.** No free historical odds feed exists, so the backtest  
+  proves calibration and the value of the gates, not profit.
+- **Draw and GG/NG 2+ are paper-only** because the evidence does not support real stakes.
+- **Live free-source paths** (ESPN, ClubElo, InferSports) were not reachable in the build  
+  sandbox. They are covered by offline parsers and stubs; watch the first real run.
+- **Per-game history covers nine leagues.** Elsewhere the methodologies use ESPN's last five  
+  games, and the sample gates make them stricter.
 - **Nothing is guaranteed.** This is an analytical tool. It quantifies  
   probability; it does not predict the future.

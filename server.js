@@ -11,7 +11,9 @@
  *   GET /api/leagues               -> league registry
  *   GET /api/matches?date=YYYY-MM-DD  -> fixture board (fast, no deep analysis)
  *   GET /api/analysis?league=&event=  -> full deep report for one match
- *   GET /api/bankers?date=&limit=     -> deep analysis across the day, banker picks
+ *   GET /api/bankers?date=&limit=     -> legacy banker election (superseded by predictions)
+ *   GET /api/predictions?date=&limit= -> methodology predictions across the day, grouped by market
+ *   GET /api/methodology              -> the eleven market methodologies and their thresholds
  */
 
 const http = require('http');
@@ -23,6 +25,7 @@ const L = require('./lib/leagues');
 const A = require('./lib/analysis');
 const E = require('./lib/engine');
 const IS = require('./lib/infersports');
+const MI = require('./lib/methodology');
 
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '127.0.0.1';
@@ -169,7 +172,7 @@ async function getAnalysis(league, eventId, year, matchHint, dateYmd) {
 }
 
 /** Analyse every match on a date, with a concurrency cap. */
-async function buildBankers(dateYmd, limit) {
+async function analyseDay(dateYmd, limit) {
   const board = await buildBoard(dateYmd);
   const all = board.leagues.flatMap((lg) => lg.matches);
 
@@ -200,6 +203,12 @@ async function buildBankers(dateYmd, limit) {
     }
   }
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length || 1) }, worker));
+  return { board, reports };
+}
+
+/** Legacy banker view: kept so existing API consumers do not break. */
+async function buildBankers(dateYmd, limit) {
+  const { reports } = await analyseDay(dateYmd, limit);
 
   const bankers = reports
     .filter((r) => r.analysable && r.banker)
@@ -259,6 +268,40 @@ async function buildBankers(dateYmd, limit) {
   };
 }
 
+/**
+ * Methodology predictions for a day.
+ *
+ * A fixture appears under every market it genuinely falls under. `headline` is
+ * the strongest single prediction per fixture, ranked LOCK > PREDICT > PAPER.
+ */
+async function buildPredictions(dateYmd, limit) {
+  const { reports } = await analyseDay(dateYmd, limit);
+  const agg = E.collectPredictions(reports);
+  const analysable = reports.filter((r) => r.analysable);
+  const withHistory = analysable.filter((r) => r.dataProvenance && r.dataProvenance.hasHistory).length;
+  const withElo = analysable.filter((r) => r.dataProvenance && r.dataProvenance.hasElo).length;
+  const statusCounts = {};
+  for (const h of agg.headline) statusCounts[h.prediction.status] = (statusCounts[h.prediction.status] || 0) + 1;
+
+  return {
+    date: isoFromYmd(dateYmd),
+    analysed: reports.length,
+    analysable: analysable.length,
+    predicted: agg.headline.length,
+    statusCounts,
+    coverage: { withHistory, withElo },
+    methods: MI.SPECS.map((s) => ({ id: s.id, name: s.name, family: s.family, count: agg.counts[s.id] || 0 })),
+    headline: agg.headline,
+    byMethod: agg.byMethod,
+    skipped: analysable.length - agg.headline.length,
+    unanalysable: reports.filter((r) => !r.analysable).map((r) => ({ match: brief(r.match), reason: r.reason || null })),
+  };
+}
+
+function brief(m) {
+  return { id: m.id, league: m.league, leagueName: m.leagueName, home: m.home, away: m.away, date: m.date };
+}
+
 // ---------------------------------------------------------------- router
 
 const server = http.createServer(async (req, res) => {
@@ -288,6 +331,8 @@ const server = http.createServer(async (req, res) => {
           'site.api.espn.com/apis/site/v2/sports/soccer/{league}/summary',
           'sports.core.api.espn.com/.../teams/{id}/statistics',
           'api.infersports.dev/v1/events/{id}/odds  (Asian books, keyless)',
+          'raw.githubusercontent.com/openfootball/*  (per-game results history, keyless)',
+          'api.clubelo.com/{date}  (independent Elo ratings, keyless)',
         ],
         // Secondary source diagnostics. `errors` here is informational: the
         // engine is designed to run correctly with this source unavailable.
@@ -315,6 +360,24 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, report);
     }
 
+    if (p === '/api/predictions') {
+      const dateYmd = normaliseDate(url.searchParams.get('date'));
+      const limit = Number(url.searchParams.get('limit')) || 60;
+      return json(res, 200, await buildPredictions(dateYmd, limit));
+    }
+
+    if (p === '/api/methodology') {
+      return json(res, 200, {
+        version: '4.0',
+        config: MI.core.CFG,
+        methods: MI.SPECS.map((s) => ({
+          id: s.id, name: s.name, version: s.version, family: s.family,
+          floor: s.floor, minRatio: s.minRatio || null, minSample: s.minSample || MI.core.CFG.minSample,
+          paperOnly: !!s.paperOnly, maxLegs: s.maxLegs || null, stake: s.stake || null,
+        })),
+      });
+    }
+
     if (p === '/api/bankers') {
       const dateYmd = normaliseDate(url.searchParams.get('date'));
       const limit = Number(url.searchParams.get('limit')) || 60;
@@ -337,7 +400,9 @@ server.listen(PORT, HOST, () => {
   console.log(`  Leagues     ${L.CORE_SLUGS.length} core / ${L.all().length} total`);
   console.log('  Data        ESPN public APIs        (fixtures, xG, form, H2H)');
   console.log('              api.infersports.dev     (Asian books, multi-line)');
-  console.log('              both free and keyless');
+  console.log('              openfootball results    (per-game history, 0/1/2+ goal evidence)');
+  console.log('              api.clubelo.com         (independent Elo strength read)');
+  console.log('              all free and keyless');
   const q = IS.quotaSnapshot();
   console.log(`  Odds quota  ${q.limit == null ? 'unknown' : q.limit}/day` +
     (q.remaining == null ? '' : `, ${q.remaining} left`));
