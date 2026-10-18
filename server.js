@@ -13,6 +13,7 @@
  *   GET /api/analysis?league=&event=  -> full deep report for one match
  *   GET /api/bankers?date=&limit=     -> legacy banker election (superseded by predictions)
  *   GET /api/predictions?date=&limit= -> methodology predictions across the day, grouped by market
+ *   GET /api/sources-check            -> probes candidate free data sources from this server
  *   GET /api/methodology              -> the eleven market methodologies and their thresholds
  */
 
@@ -338,6 +339,10 @@ const server = http.createServer(async (req, res) => {
         // engine is designed to run correctly with this source unavailable.
         asianSource: IS.netStats(),
       });
+    }
+
+    if (p === '/api/sources-check') {
+      return json(res, 200, await require('./lib/sourcecheck').checkSources());
     }
 
     if (p === '/api/leagues') {

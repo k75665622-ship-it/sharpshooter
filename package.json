@@ -12,7 +12,8 @@
     "test:board": "node test_board.js",
     "test:quota": "node test_quota.js",
     "test:methodology": "node test_methodology.js",
-    "backtest": "node backtest_methodology.js"
+    "backtest": "node backtest_methodology.js",
+    "check:sources": "node lib/sourcecheck.js"
   },
   "engines": {
     "node": ">=18"
