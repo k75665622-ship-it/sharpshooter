@@ -20,8 +20,8 @@ Elo, news, bookmaker price), then runs all eleven methodologies against it.
    0.5 or more. Qualification needs **at least 85%** of the *known* checks to pass,
    and at least 60% of the checks must be known.
 3. **Status ladder.** `LOCK` > `PREDICT` > `PAPER` > `WATCH` > `REMOVE`.
-   - **LOCK**: gates and checklist pass, and a real bookmaker price shows an edge.
-   - **PREDICT**: gates and checklist pass; no verified price edge.
+   - **LOCK**: switched off. It used to mean a real price showed an edge, but the price backtest found that edge loses money (see below). Re-enable with `CFG.priceEdgeLocks` only if a later backtest proves it.
+   - **PREDICT**: gates and checklist pass. This is what every qualifying pick is today: a likely outcome, not a proven value bet.
    - **PAPER**: qualifies, but the market is on probation (see below). Log it, do not stake.
    - **WATCH**: close, but too thin or just under the pass ratio.
    - **REMOVE**: a hard gate failed, or the checklist is far off.
@@ -134,9 +134,16 @@ agrees (waived if absent); no rotation; attack intact; any streak is backed by t
 - Calibration is honest overall: 66.8% stated vs 66.5% observed on held-out 2025 matches.
 - The gates add real value for BTTS, and little for Over/Under 2.5.
 - Draw has no predictive value, so it is paper-only.
-- **Price edge and profit are untested.** There is no free historical odds feed, so nothing
-  here proves the strategy makes money. LOCK means "the numbers show an edge against a
-  quoted price", not "this will win".
+- **Price backtest (real closing odds, 19 leagues, from Aug 2024, about 1,800 qualifying picks):**
+  hit rate 60.3% at an average price of 1.62, ROI **−7.0%** (95% range −10.7% to −3.4%). Betting
+  blindly returned −6.6%. The picks are about as good as the market already thinks they are.
+- **The model's price edge loses money.** Betting wherever the model saw an edge over the closing
+  price returned −12.5%; LOCK picks returned −11.1% and PREDICT −5.8%. So edge no longer promotes a pick.
+- No league or market was reliably profitable. Home Win (+2.1%), Serie A (+4.4%) and Japan (+87%)
+  all have ranges that include zero and are noise. Draw returned −17.7%.
+- BTTS, team totals and GG/NG 2+ have no historical price and cannot be profit-tested.
+- `CFG.marketAgree` adds a "do not fight the market" gate (model may not exceed the de-vigged
+  bookmaker probability by more than 5 points). It is **off** until `/api/price-backtest` shows it helps.
 - The live ESPN, ClubElo and InferSports paths could not be exercised in the build sandbox
   (only GitHub was reachable). They are covered by offline parsers and stubbed tests; the first
   real run should be watched.

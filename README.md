@@ -555,8 +555,9 @@ behaviour. If you want more picks, the `lean` tier is where they live.
   which is why unquoted markets are barred from banker election.
 - **Early season is noisy.** With four games played, ratings are shrunk hard  
   toward the mean. The model reports its own sample size and flags it.
-- **Price edge is untested.** No free historical odds feed exists, so the backtest  
-  proves calibration and the value of the gates, not profit.
+- **Picks do not beat closing prices.** A backtest on real closing odds (19 leagues) returned  
+  about −7% ROI, in line with betting blindly. The model's price edge lost money, so it no longer  
+  promotes picks. `GET /api/price-backtest` reruns it.
 - **Draw and GG/NG 2+ are paper-only** because the evidence does not support real stakes.
 - **Live free-source paths** (ESPN, ClubElo, InferSports) were not reachable in the build  
   sandbox. They are covered by offline parsers and stubs; watch the first real run.

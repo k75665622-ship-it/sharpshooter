@@ -530,8 +530,8 @@ function bindDetail() {
 /* ---------------------------------------------------------- methodology helpers */
 
 const STATUS_META = {
-  LOCK:    { cls: 'lock',    label: 'Lock',       blurb: 'Every gate passed and the price shows a real edge.' },
-  PREDICT: { cls: 'predict', label: 'Predict',    blurb: 'Every gate passed. No verified price edge, so check your own bookmaker.' },
+  LOCK:    { cls: 'lock',    label: 'Priced edge', blurb: 'Every gate passed and the model rates the price above the market. Backtests found this has not beaten closing prices.' },
+  PREDICT: { cls: 'predict', label: 'Predict',    blurb: 'Every gate passed. A likely outcome, not a proven value bet. Compare with your own bookmaker.' },
   PAPER:   { cls: 'paper',   label: 'Paper only', blurb: 'Qualifies on the data, but this market has not earned real stakes. Track it first.' },
   WATCH:   { cls: 'watch',   label: 'Watch',      blurb: 'Close, but not enough evidence to call it.' },
   REMOVE:  { cls: 'remove',  label: 'No',         blurb: 'Fails a hard gate or too few checks.' },
@@ -546,7 +546,7 @@ function statusBadge(p) {
 
 function priceLine(p) {
   const pr = p.price || {};
-  if (pr.state === 'edge') return `<b>${dec(pr.price)}</b> · edge ${dec(pr.ratio)}x`;
+  if (pr.state === 'edge') return `<b>${dec(pr.price)}</b> · model ${dec(pr.ratio)}x price`;
   if (pr.price) return `<b>${dec(pr.price)}</b> · ${esc(pr.state === 'too-short' ? 'too short' : 'no edge')}`;
   return `fair <b>${dec(p.fairOdds)}</b> · no quote`;
 }
@@ -627,6 +627,7 @@ function methodologySection(rep) {
         <div><div class="v">${h.checklist.passed}/${h.checklist.known}</div><div class="k">Checks passed</div></div>
       </div>
       <div class="v-note">${esc(m.blurb)} ${h.price && h.price.note ? esc(h.price.note) : ''}</div>
+      <div class="v-honest">This is a probability call, not a profit promise: backtests at real closing prices did not show these picks making money.</div>
       ${h.paperOnly ? `<div class="v-paper">Paper only: record the result, do not stake real money until the sample proves it.${h.stake ? ' If tracking, ' + esc(h.stake) + '.' : ''}</div>` : ''}
     </div>`;
     const others = mt.predictions.filter((p) => p.id !== h.id);
@@ -681,7 +682,7 @@ function summaryStrip(d) {
   const sc = d.statusCounts || {};
   const chip = (k, n, lab) => `<div class="ss-cell st-${k}"><div class="v">${n}</div><div class="k">${lab}</div></div>`;
   return `<div class="sumstrip">
-    ${chip('lock', sc.LOCK || 0, 'Lock')}${chip('predict', sc.PREDICT || 0, 'Predict')}${chip('paper', sc.PAPER || 0, 'Paper only')}
+    ${sc.LOCK ? chip('lock', sc.LOCK, 'Priced edge') : ''}${chip('predict', sc.PREDICT || 0, 'Predict')}${chip('paper', sc.PAPER || 0, 'Paper only')}
     <div class="ss-cell"><div class="v">${d.analysable}</div><div class="k">Fixtures analysed</div></div>
     <div class="ss-cell"><div class="v">${d.skipped}</div><div class="k">No market fits</div></div>
     <div class="ss-cell small"><div class="k">Per-game history ${d.coverage.withHistory}/${d.analysable}<br>Elo ${d.coverage.withElo}/${d.analysable}</div></div>
@@ -707,7 +708,7 @@ function renderPredictions() {
     ${d.methods.filter((m) => m.count).map((m) => `<button class="fchip ${f.method === m.id ? 'is-active' : ''}" data-m="${esc(m.id)}">${esc(m.name)} <b>${m.count}</b></button>`).join('')}
   </div>
   <div class="filters sub">
-    ${['all', 'LOCK', 'PREDICT', 'PAPER'].map((s) => `<button class="fchip ${f.status === s ? 'is-active' : ''}" data-s="${s}">${s === 'all' ? 'Any status' : statusMeta(s).label}</button>`).join('')}
+    ${['all', ...(d.statusCounts && d.statusCounts.LOCK ? ['LOCK'] : []), 'PREDICT', 'PAPER'].map((s) => `<button class="fchip ${f.status === s ? 'is-active' : ''}" data-s="${s}">${s === 'all' ? 'Any status' : statusMeta(s).label}</button>`).join('')}
   </div>`;
 
   const keep = (it) => f.status === 'all' || it.prediction.status === f.status;
@@ -795,7 +796,7 @@ async function renderMethod() {
       genuinely falls under it: all hard gates must pass (unknown evidence counts as a fail), then at least
       <b>${Math.round((c.qualify || 0.85) * 100)}%</b> of its checklist must pass. Where two qualifying picks contradict, the weaker is set aside.</p>
       <div class="ladder">
-        ${['LOCK', 'PREDICT', 'PAPER', 'WATCH', 'REMOVE'].map((s) => `<div class="lad st-${statusMeta(s).cls}"><b>${statusMeta(s).label}</b><span>${esc(statusMeta(s).blurb)}</span></div>`).join('')}
+        ${['PREDICT', 'PAPER', 'WATCH', 'REMOVE'].map((s) => `<div class="lad st-${statusMeta(s).cls}"><b>${statusMeta(s).label}</b><span>${esc(statusMeta(s).blurb)}</span></div>`).join('')}
       </div>
     </div>
     <div class="sec-title">The methodologies <span class="pill">${d.methods.length}</span></div>
@@ -812,10 +813,10 @@ async function renderMethod() {
       <h3>What the evidence says</h3>
       <ul>
         <li><b>Probabilities are calibrated.</b> Goal-market probabilities are recalibrated on 2023–24 results and checked on held-out 2025 matches. Stated 66.8% hit 66.5% in testing.</li>
-        <li><b>Draw is paper only.</b> In the walk-forward backtest the draw model had no predictive value, so it never produces a stake-worthy pick.</li>
-        <li><b>The gates add real value for BTTS</b> and little for Over/Under 2.5. They are kept because they stop obviously bad spots.</li>
+        <li><b>Picks are likely outcomes, not proven profit.</b> Tested at real closing odds across 19 leagues (about 1,800 picks), the qualifying picks hit 60% but returned about −7%, roughly what betting blindly returns. No league or market was reliably profitable.</li>
+        <li><b>The model's price edge does not work.</b> Where the model thought a price was too generous, it lost 12.5%. So edge no longer promotes a pick, and it is shown for information only.</li>
+        <li><b>Draw is paper only.</b> It had no predictive value in testing.</li>
         <li><b>GG/NG 2+ stays on paper</b> until 40 tracked legs prove it. It cannot be tested from results alone.</li>
-        <li><b>Price edge is untested.</b> There is no free historical odds feed, so profit is not proven. Use fair odds as a guide and compare with your own bookmaker.</li>
         <li><b>No outcome is guaranteed.</b> Analytical output only.</li>
       </ul>
     </div>`;

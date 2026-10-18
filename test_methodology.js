@@ -226,10 +226,32 @@ const priced = (mult) => (m) => ((m.key === 'O2.5') ? m.fairOdds * mult : undefi
 const withEdge = run({ lamH: 1.75, lamA: 1.65, home: OPEN_H, away: OPEN_A, h2h: [{ hg: 2, ag: 2 }, { hg: 3, ag: 1 }, { hg: 1, ag: 2 }, { hg: 2, ag: 1 }], price: priced(1.25) });
 const noEdge = run({ lamH: 1.75, lamA: 1.65, home: OPEN_H, away: OPEN_A, h2h: [{ hg: 2, ag: 2 }, { hg: 3, ag: 1 }, { hg: 1, ag: 2 }, { hg: 2, ag: 1 }], price: priced(0.9) });
 const unpriced = run({ lamH: 1.75, lamA: 1.65, home: OPEN_H, away: OPEN_A, h2h: [{ hg: 2, ag: 2 }, { hg: 3, ag: 1 }, { hg: 1, ag: 2 }, { hg: 2, ag: 1 }] });
-t('the same fixture: a generous real price -> LOCK', R(withEdge, 'over25').status === 'LOCK', `${R(withEdge, 'over25').status} ${R(withEdge, 'over25').price.note}`);
+t('default config: a generous real price is shown as edge but NOT promoted to LOCK (backtest: edge loses money)',
+  R(withEdge, 'over25').status === 'PREDICT' && R(withEdge, 'over25').price.state === 'edge', `${R(withEdge, 'over25').status} ${R(withEdge, 'over25').price.state}`);
+core.CFG.priceEdgeLocks = true;
+const lockOn = run({ lamH: 1.75, lamA: 1.65, home: OPEN_H, away: OPEN_A, h2h: [{ hg: 2, ag: 2 }, { hg: 3, ag: 1 }, { hg: 1, ag: 2 }, { hg: 2, ag: 1 }], price: priced(1.25) });
+core.CFG.priceEdgeLocks = false;
+t('with priceEdgeLocks enabled the same fixture is a LOCK', R(lockOn, 'over25').status === 'LOCK', `${R(lockOn, 'over25').status}`);
 t('a short real price -> PREDICT, never LOCK', R(noEdge, 'over25').status === 'PREDICT', `${R(noEdge, 'over25').status}`);
+
+// ---- Rule 22: market agreement (de-vigged real prices)
+const twoWay = (over, under) => (m) => (m.key === 'O2.5' ? over : m.key === 'U2.5' ? under : undefined);
+const mkt = run({ lamH: 1.75, lamA: 1.65, home: OPEN_H, away: OPEN_A, h2h: [{ hg: 2, ag: 2 }, { hg: 3, ag: 1 }, { hg: 1, ag: 2 }, { hg: 2, ag: 1 }], price: twoWay(2.2, 1.7) });
+const mp = R(mkt, 'over25').marketProb;
+t('market probability is the de-vigged two-way price', mp != null && Math.abs(mp - (1 / 2.2) / (1 / 2.2 + 1 / 1.7)) < 1e-9, String(mp));
+t('no market probability without a quoted pair', R(withEdge, 'over25').marketProb == null);
+t('agreement gate is absent by default', !R(mkt, 'over25').gates.some((g) => g.id === 'MARKET'));
+core.CFG.marketAgree = true;
+const fight = run({ lamH: 1.75, lamA: 1.65, home: OPEN_H, away: OPEN_A, h2h: [{ hg: 2, ag: 2 }, { hg: 3, ag: 1 }, { hg: 1, ag: 2 }, { hg: 2, ag: 1 }], price: twoWay(2.2, 1.7) });
+const agree = run({ lamH: 1.75, lamA: 1.65, home: OPEN_H, away: OPEN_A, h2h: [{ hg: 2, ag: 2 }, { hg: 3, ag: 1 }, { hg: 1, ag: 2 }, { hg: 2, ag: 1 }], price: (m) => (m.key === 'O2.5' || m.key === 'U2.5' ? m.fairOdds * 0.95 : undefined) });
+const noQuote = run({ lamH: 1.75, lamA: 1.65, home: OPEN_H, away: OPEN_A, h2h: [{ hg: 2, ag: 2 }, { hg: 3, ag: 1 }, { hg: 1, ag: 2 }, { hg: 2, ag: 1 }] });
+core.CFG.marketAgree = false;
+t('model far above the market is blocked when the gate is on', !R(fight, 'over25').qualifies && R(fight, 'over25').failedGates.includes('MARKET'), `${R(fight, 'over25').status} ${R(fight, 'over25').failedGates}`);
+t('model in line with the market still passes', R(agree, 'over25').qualifies, `${R(agree, 'over25').status} ${R(agree, 'over25').failedGates}`);
+t('an unquoted market is not blocked by the gate (waived)', R(noQuote, 'over25').qualifies);
+t('counterKeys pairs the sides of a market', core.counterKeys('AH_H_-1')[0] === 'AH_A_-1' && core.counterKeys('1').join() === 'X,2' && core.counterKeys('TTH_O1.5')[0] === 'TTH_U1.5');
 t('no price at all -> PREDICT with fair odds', R(unpriced, 'over25').status === 'PREDICT' && R(unpriced, 'over25').fairOdds > 1);
-t('LOCK outranks PREDICT in the headline', core.STATUS_RANK.LOCK > core.STATUS_RANK.PREDICT && core.STATUS_RANK.PREDICT > core.STATUS_RANK.PAPER);
+t('status ranking is intact (LOCK > PREDICT > PAPER) for when edge locks are re-enabled', core.STATUS_RANK.LOCK > core.STATUS_RANK.PREDICT && core.STATUS_RANK.PREDICT > core.STATUS_RANK.PAPER);
 t('every result exposes gates, checklist, support and failure case', open.results.every((r) => Array.isArray(r.gates) && r.checklist && Array.isArray(r.support) && Array.isArray(r.failure)));
 t('failed gates are listed by id', R(open, 'under25').failedGates.length > 0 && R(open, 'under25').gates.filter((g) => !g.pass).length === R(open, 'under25').failedGates.length);
 
@@ -254,14 +276,14 @@ for (let i = 0; i < 400; i++) {
     if (ids.includes('over25') && ids.includes('under25')) contradictions++;
     if (ids.includes('bttsYes') && ids.includes('bttsNo')) contradictions++;
     for (const r of out.results) {
-      if (r.status === 'LOCK' && r.price.state !== 'edge') locksWithoutPrice++;
+      if (r.status === 'LOCK') locksWithoutPrice++; // default config: nothing may be promoted to LOCK
       if (r.id === 'gg2' && r.status === 'LOCK') gg2Locks++;
     }
   } catch (e) { crashes++; console.log('   crash:', e.message); }
 }
 t(`400 random fixtures evaluated without a crash (${total})`, crashes === 0 && total === 400);
 t('no two predictions on one fixture contradict each other', contradictions === 0, `${contradictions} contradictions`);
-t('a LOCK always has a real price with the required edge', locksWithoutPrice === 0, `${locksWithoutPrice}`);
+t('default config never produces a LOCK', locksWithoutPrice === 0, `${locksWithoutPrice}`);
 t('GG/NG 2+ is never a LOCK', gg2Locks === 0);
 t(`selective: ${predictedFixtures}/${total} fixtures get any prediction`, predictedFixtures < total * 0.75, `${predictedFixtures}/${total}`);
 
