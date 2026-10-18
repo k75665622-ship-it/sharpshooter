@@ -15,7 +15,8 @@
  *   GET /api/predictions?date=&limit= -> methodology predictions across the day, grouped by market
  *   GET /api/price-backtest           -> profit backtest on real historical odds (runs in background; ?format=json)
  *   GET /api/sources-check            -> probes candidate free data sources from this server
- *   GET /api/methodology              -> the eleven market methodologies and their thresholds
+ *   GET /api/methodology              -> the thirteen v5 methodologies, thresholds and backtest record
+ *   GET /api/ledger[?format=csv]      -> live track record (predictions recorded pre-match, settled after)
  */
 
 const http = require('http');
@@ -28,9 +29,13 @@ const A = require('./lib/analysis');
 const E = require('./lib/engine');
 const IS = require('./lib/infersports');
 const MI = require('./lib/methodology');
+const LEDGER = require('./lib/ledger');
+const BACKTEST = require('./lib/backtest.json');
 
-const PORT = Number(process.env.PORT) || 3000;
-const HOST = process.env.HOST || '127.0.0.1';
+const PORT = process.env.PORT != null && process.env.PORT !== '' && Number.isFinite(Number(process.env.PORT)) ? Number(process.env.PORT) : 3000;
+// Hosted platforms (Render, Railway, Fly, Heroku) set PORT and route traffic to the
+// container's public interface, so bind 0.0.0.0 there; stay on loopback for local runs.
+const HOST = process.env.HOST || (process.env.PORT || process.env.RENDER ? '0.0.0.0' : '127.0.0.1');
 const PUBLIC = path.join(__dirname, 'public');
 
 // ---------------------------------------------------------------- helpers
@@ -278,6 +283,12 @@ async function buildBankers(dateYmd, limit) {
  */
 async function buildPredictions(dateYmd, limit) {
   const { reports } = await analyseDay(dateYmd, limit);
+  // Write every pre-match prediction to the track record before anyone sees a result.
+  try {
+    LEDGER.record(reports);
+  } catch {
+    /* the ledger is best-effort and must never break the board */
+  }
   const agg = E.collectPredictions(reports);
   const analysable = reports.filter((r) => r.analysable);
   const withHistory = analysable.filter((r) => r.dataProvenance && r.dataProvenance.hasHistory).length;
@@ -295,6 +306,12 @@ async function buildPredictions(dateYmd, limit) {
     methods: MI.SPECS.map((s) => ({ id: s.id, name: s.name, family: s.family, count: agg.counts[s.id] || 0 })),
     headline: agg.headline,
     byMethod: agg.byMethod,
+    // v5: the general prediction for EVERY analysable fixture, so a match that falls under
+    // no methodology still gets a result call, goals call, BTTS call and a predicted score.
+    general: analysable
+      .filter((r) => r.general && !r.general.error)
+      .map((r) => ({ match: briefFull(r.match), general: r.general, methodology: r.methodology && r.methodology.headline ? { id: r.methodology.headline.id, status: r.methodology.headline.status, label: r.methodology.headline.pick.label } : null }))
+      .sort((a, b) => new Date(a.match.date) - new Date(b.match.date)),
     skipped: analysable.length - agg.headline.length,
     unanalysable: reports.filter((r) => !r.analysable).map((r) => ({ match: brief(r.match), reason: r.reason || null })),
   };
@@ -302,6 +319,25 @@ async function buildPredictions(dateYmd, limit) {
 
 function brief(m) {
   return { id: m.id, league: m.league, leagueName: m.leagueName, home: m.home, away: m.away, date: m.date };
+}
+
+function briefFull(m) {
+  return {
+    id: m.id, league: m.league, leagueName: m.leagueName, leagueFlag: m.leagueFlag, leagueTier: m.leagueTier,
+    date: m.date, home: m.home, away: m.away, state: m.state, seasonYear: m.seasonYear,
+  };
+}
+
+// Settling the ledger touches ESPN once per league-day; do it at most every 10 minutes.
+let lastSettle = 0;
+async function settleLedger() {
+  if (Date.now() - lastSettle < 10 * 60 * 1000) return 0;
+  lastSettle = Date.now();
+  try {
+    return await LEDGER.settleAll();
+  } catch {
+    return 0;
+  }
 }
 
 // ---------------------------------------------------------------- router
@@ -335,6 +371,11 @@ const server = http.createServer(async (req, res) => {
           'api.infersports.dev/v1/events/{id}/odds  (Asian books, keyless)',
           'raw.githubusercontent.com/openfootball/*  (per-game results history, keyless)',
           'api.clubelo.com/{date}  (independent Elo ratings, keyless)',
+          'site.api.espn.com/.../scoreboard?dates=RANGE  (whole-season results, v5)',
+          'site.api.espn.com/.../summary odds  (Bet365 + DraftKings, v5)',
+          'raw.githubusercontent.com/openfootball/football.json  (19+ leagues, v5)',
+          'football-data.co.uk  (results + multi-book odds incl. Pinnacle, v5)',
+          'fantasy.premierleague.com/api/bootstrap-static  (Premier League availability, v5)',
         ],
         // Secondary source diagnostics. `errors` here is informational: the
         // engine is designed to run correctly with this source unavailable.
@@ -387,14 +428,26 @@ const server = http.createServer(async (req, res) => {
 
     if (p === '/api/methodology') {
       return json(res, 200, {
-        version: '4.0',
+        version: '5.0',
         config: MI.core.CFG,
         methods: MI.SPECS.map((s) => ({
           id: s.id, name: s.name, version: s.version, family: s.family,
           floor: s.floor, minRatio: s.minRatio || null, minSample: s.minSample || MI.core.CFG.minSample,
           paperOnly: !!s.paperOnly, maxLegs: s.maxLegs || null, stake: s.stake || null,
+          headline: s.headline !== false, canLock: s.canLock !== false,
+          backtest: BACKTEST.methods[s.id] || null,
         })),
+        backtest: { dataset: BACKTEST.dataset, heldOut: BACKTEST.heldOut, fixtures: BACKTEST.fixtures, headline: BACKTEST.headline, general: BACKTEST.general },
       });
+    }
+
+    if (p === '/api/ledger') {
+      await settleLedger();
+      if (url.searchParams.get('format') === 'csv') {
+        res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="sharpshooter-ledger.csv"' });
+        return res.end(LEDGER.toCsv());
+      }
+      return json(res, 200, LEDGER.summary());
     }
 
     if (p === '/api/bankers') {

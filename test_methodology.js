@@ -170,7 +170,7 @@ const DRW_H = games([[1, 1], [0, 0], [1, 1], [2, 1], [1, 1], [0, 0], [1, 2], [1,
 const DRW_A = games([[1, 1], [0, 0], [1, 0], [1, 1], [0, 0], [2, 2], [1, 1], [0, 1]]);
 const drw = run({ lamH: 1.0, lamA: 0.95, home: DRW_H, away: DRW_A, h2h: [{ hg: 1, ag: 1 }, { hg: 0, ag: 0 }, { hg: 1, ag: 1 }, { hg: 2, ag: 1 }], rho: -0.1 });
 t('draw machine: Draw methodology reads the draw rates', gate(R(drw, 'draw'), 'MACHINE').pass, JSON.stringify(gate(R(drw, 'draw'), 'MACHINE')));
-t('Draw is paper-trade only (backtest: no predictive value)', MI.BY_ID.draw.paperOnly === true && R(drw, 'draw').status !== 'LOCK');
+t('Draw (v5): honest probability, published as a half-stake prediction, never the headline', MI.BY_ID.draw.paperOnly === false && MI.BY_ID.draw.headline === false && R(drw, 'draw').status !== 'LOCK');
 t('draw machine: Home/Away win removed', !R(drw, 'homeWin').qualifies && !R(drw, 'awayWin').qualifies);
 
 // ================================================================== 6. specific rules
@@ -218,7 +218,10 @@ t('Under 2.5 refuses defensive disruption (Rule 15 inverted)', !gate(R(under2, '
 
 // 1-1 trap for BTTS No.
 const trap = run({ lamH: 1.3, lamA: 1.2, home: games([[1, 1], [1, 0], [0, 1], [1, 1], [2, 1], [1, 1], [0, 0], [1, 2]]), away: games([[1, 1], [1, 1], [0, 1], [1, 0], [1, 1], [1, 2], [0, 0], [1, 1]]) });
-t('BTTS No fails the 1-1 trap when 1-1 is live (Rule 1)', !gate(R(trap, 'bttsNo'), 'TRAP11').pass, JSON.stringify(gate(R(trap, 'bttsNo'), 'TRAP11')));
+// v5: the 1-1 trap is a checklist item (as a hard gate it removed ~75% of candidates without
+// raising the hit rate once probabilities are calibrated), and it still fails here.
+const trapItem = R(trap, 'bttsNo').checklist.items.find((c) => c.id === 'TRAP11');
+t('BTTS No fails the 1-1 trap when 1-1 is live (Rule 1)', trapItem && trapItem.score < 0.5 && !R(trap, 'bttsNo').qualifies, JSON.stringify(trapItem));
 
 // ================================================================== 7. price states
 console.log('\n7. status ladder and price');
@@ -301,8 +304,9 @@ console.log('\n10. engine integration (stubbed context)');
   });
   try {
     const rep = await E.analyseMatch({ id: '1', league: 'eng.1', date: '2026-10-17T15:00:00Z', name: 'x', home: { id: '1', name: 'Home FC', short: 'HOM' }, away: { id: '2', name: 'Away FC', short: 'AWY' }, odds: null }, 2026);
-    t('report carries a methodology block', rep.methodology && Array.isArray(rep.methodology.all) && rep.methodology.all.length === 11, rep.methodology && rep.methodology.error);
-    t('all eleven methodologies are evaluated', new Set(rep.methodology.all.map((r) => r.id)).size === 11);
+    t('report carries a methodology block', rep.methodology && Array.isArray(rep.methodology.all) && rep.methodology.all.length === MI.SPECS.length, rep.methodology && rep.methodology.error);
+    t('all thirteen methodologies are evaluated', new Set(rep.methodology.all.map((r) => r.id)).size === 13);
+    t('v5 general prediction is attached', rep.general && rep.general.score && rep.general.score.predicted);
     t('legacy banker field is still present', 'banker' in rep);
     t('provenance reports the history source', rep.dataProvenance.hasHistory === true && rep.dataProvenance.historySample.home === 10);
     t('methodology output is JSON-serialisable', (() => { try { JSON.stringify(rep.methodology); return true; } catch { return false; } })());

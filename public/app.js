@@ -16,7 +16,7 @@ const state = {
   selectedId: null,
   preds: null,
   method: null,
-  filter: { method: 'all', status: 'all' },
+  filter: { method: 'all', status: 'all', conf: 'all' },
   bankersOnly: false,
   autoRefresh: true,
   loadingDetail: false,
@@ -98,6 +98,10 @@ function renderBoard() {
   if (state.preds && state.preds.headline) {
     for (const b of state.preds.headline) bankerMap.set(String(b.match.id), b);
   }
+  const genMap = new Map(); // fixture id -> general prediction
+  if (state.preds && state.preds.general) {
+    for (const g of state.preds.general) genMap.set(String(g.match.id), g.general);
+  }
 
   let html = '';
   let shown = 0;
@@ -140,6 +144,9 @@ function renderBoard() {
         : '';
 
       let badge = '';
+      const gp = genMap.get(String(m.id));
+      const scoreChip = gp && !isPost && !isLive
+        ? `<span class="sc-chip" title="Predicted final score · ${esc(gp.result.label)} ${pct(gp.result.prob, 0)}">${gp.score.predicted.home}–${gp.score.predicted.away}</span>` : '';
       if (isLive) badge = `<span class="badge live">live</span>`;
       else if (bk) {
         const sm = statusMeta(bk.prediction.status);
@@ -161,7 +168,7 @@ function renderBoard() {
           </div>
         </div>
         <div class="mr-right">
-          ${badge}
+          <div class="mr-badges">${scoreChip}${badge}</div>
           ${oddsHtml}
         </div>
       </div>`;
@@ -262,11 +269,107 @@ function renderDetail(rep) {
     return;
   }
 
-  el.innerHTML = head + methodologySection(rep) + modelSection(rep) + marketSection(rep)
+  el.innerHTML = head + generalSection(rep) + methodologySection(rep) + ensembleSection(rep)
+    + availabilitySection(rep) + modelSection(rep) + marketSection(rep)
     + patternSection(rep) + trapSection(rep) + lineMovementSection(rep)
     + h2hSection(rep) + formSection(rep) + provenanceSection(rep) + newsSection(rep);
 
   bindDetail();
+}
+
+/* ---------------------------------------------------------- v5 detail sections */
+
+function scoreGrid(g, home, away) {
+  // a compact 5x5 exact-score heat grid from the top scores list
+  const top = new Map((g.score.top || []).map((t) => [t.score, t.prob]));
+  if (g.score.grid5) g.score.grid5.forEach((row, h) => row.forEach((p, a) => top.set(`${h}-${a}`, p)));
+  const max = Math.max(...top.values(), 0.01);
+  let rows = '<div class="sg"><div class="sg-corner"></div>';
+  for (let a = 0; a <= 4; a++) rows += `<div class="sg-h">${a}</div>`;
+  for (let h = 0; h <= 4; h++) {
+    rows += `<div class="sg-h">${h}</div>`;
+    for (let a = 0; a <= 4; a++) {
+      const k = `${h}-${a}`;
+      const p = top.get(k);
+      const isPred = k === g.score.predicted.score;
+      rows += `<div class="sg-c ${isPred ? 'is-pred' : ''}" style="${p ? `--w:${(p / max).toFixed(2)}` : ''}" title="${k}${p ? ' · ' + pct(p, 1) : ''}">${p >= 0.005 ? pct(p, 0) : ''}</div>`;
+    }
+  }
+  rows += '</div>';
+  return `<div class="sg-wrap"><div class="sg-axis">${esc(home)} goals ↓ · ${esc(away)} goals →</div>${rows}</div>`;
+}
+
+function generalSection(rep) {
+  const g = rep.general;
+  if (!g || g.error) return '';
+  const m = rep.match;
+  const sp = g.score;
+  const cc = CONF_CLS[g.confidence.level] || 'watch';
+  const bb = g.bestBet;
+  return `<div class="sec"><div class="sec-title">Prediction <span class="pill">general · v${esc(g.version)}</span>
+      <span class="badge st-${cc}" title="${esc(g.confidence.reasons.join(' · '))}">${esc(g.confidence.level)} confidence</span></div>
+    <div class="gp">
+      <div class="gp-score">
+        <div class="gp-k">Predicted final score</div>
+        <div class="gp-sc">${esc(m.home.short || m.home.name)} <b>${sp.predicted.home} – ${sp.predicted.away}</b> ${esc(m.away.short || m.away.name)}</div>
+        <div class="gp-sub">${pct(sp.predicted.prob, 1)} exact · half-time ${esc(sp.halfTime.score)} · xG ${dec(sp.expected.home)}–${dec(sp.expected.away)}</div>
+        ${sp.mostLikely.score !== sp.predicted.score ? `<div class="gp-sub">Single likeliest score: <b>${esc(sp.mostLikely.score)}</b> (${pct(sp.mostLikely.prob, 1)})</div>` : ''}
+        <div class="gp-sub">Score band (${pct(sp.band.prob, 0)}): ${esc(sp.band.scores.join(', '))}</div>
+      </div>
+      <div class="gp-calls">
+        <div class="gp-call"><span>Result</span><b>${esc(g.result.label)}</b><em>${pct(g.result.prob, 0)}</em></div>
+        <div class="gp-call"><span>Double chance</span><b>${esc(g.doubleChance ? g.doubleChance.label : '—')}</b><em>${g.doubleChance ? pct(g.doubleChance.prob, 0) : ''}</em></div>
+        <div class="gp-call"><span>Goals</span><b>${esc(g.goals.call)} 2.5</b><em>${pct(g.goals.prob, 0)}</em></div>
+        <div class="gp-call"><span>Both score</span><b>${esc(g.btts.call)}</b><em>${pct(g.btts.prob, 0)}</em></div>
+        ${(g.goals.extra || []).map((x) => `<div class="gp-call"><span>Also</span><b>${esc(x.label)}</b><em>${pct(x.prob, 0)}</em></div>`).join('')}
+      </div>
+    </div>
+    ${bb ? `<div class="gp-best">
+      <div class="gp-k">${g.source === 'methodology' ? `Best bet · from ${esc(bb.methodology)} (${esc(statusMeta(bb.status).label)})` : 'Best bet · most likely selection paying ≥ 1.30'}</div>
+      <div class="gp-bb">${esc(bb.label)} <em>${pct(bb.prob, 0)}</em></div>
+      <div class="gp-sub">Fair odds ${dec(bb.fairOdds)} · take it at <b>${dec(bb.valuePrice)}</b> or better${bb.best ? ` · best seen ${dec(bb.best)} (${esc(bb.bestBook || '')})` : ''}${bb.modelProb != null ? ` · independent model ${pct(bb.modelProb, 0)}` : ''}</div>
+    </div>` : ''}
+    ${scoreGrid(g, m.home.short || m.home.name, m.away.short || m.away.name)}
+    <div class="gp-sum">${esc(g.summary)}</div>
+  </div>`;
+}
+
+function ensembleSection(rep) {
+  const e = rep.model && rep.model.ensemble;
+  if (!e) return '';
+  const comp = e.components || {};
+  const names = { market: 'Bookmaker consensus', ratings: 'Results ratings (Dixon-Coles)', xg: 'ESPN xG formula', elo: 'ClubElo' };
+  const rows = Object.entries(names).map(([k, label]) => {
+    const c = comp[k];
+    const w = k === 'market' ? e.weights.market : (e.weights.parts && e.weights.parts[k] != null ? e.weights.parts[k] * e.weights.model / Object.values(e.weights.parts).reduce((a, b) => a + b, 0) : 0);
+    return `<div class="en-row ${c ? '' : 'is-off'}"><span>${esc(label)}</span>
+      <span class="num">${c ? dec(c.lamH) + ' – ' + dec(c.lamA) : 'not available'}</span>
+      <span class="en-bar"><span style="width:${c ? Math.round(w * 100) : 0}%"></span></span><span class="num">${c ? Math.round(w * 100) + '%' : ''}</span></div>`;
+  }).join('');
+  const cons = rep.consensus;
+  const x = cons && cons.x12;
+  const ag = e.agreement || {};
+  return `<div class="sec"><div class="sec-title">How the probabilities were built <span class="pill">${esc(e.calibrationSet === 'withMarket' ? 'market-anchored' : 'model only')} · calibrated</span></div>
+    <div class="en-head"><span>Component</span><span class="num">Expected goals</span><span></span><span class="num">Weight</span></div>
+    ${rows}
+    <div class="en-final">Final: <b>${dec(rep.model.lambda.home)} – ${dec(rep.model.lambda.away)}</b> expected goals${ag.supremacySpread != null ? ` · witnesses differ by ${dec(ag.supremacySpread)} goals on supremacy` : ''}</div>
+    ${x ? `<div class="en-cons"><b>Bookmaker consensus</b> (${cons.nBooks} source${cons.nBooks === 1 ? '' : 's'}: ${esc(cons.books.join(', '))}) — fair
+      ${esc(rep.match.home.short)} ${pct(x.fair.home, 0)} · draw ${pct(x.fair.draw, 0)} · ${esc(rep.match.away.short)} ${pct(x.fair.away, 0)}
+      ${x.best && x.best.h ? `<br>Best prices: ${dec(x.best.h.price)} (${esc(x.best.h.book)}) · ${x.best.d ? dec(x.best.d.price) + ' (' + esc(x.best.d.book) + ')' : '—'} · ${x.best.a ? dec(x.best.a.price) + ' (' + esc(x.best.a.book) + ')' : '—'}` : ''}
+      ${x.spread != null && x.spread >= 0.04 ? `<br><span class="warn-t">Books disagree by ${pct(x.spread, 0)} on one outcome — one price is an outlier.</span>` : ''}</div>` : ''}
+    <div class="src-note">Probabilities are calibrated on real results (38,700 matches with every model input, from a 46,121-match research set). With a price, the market carries 90% of the weight because in testing it was the most accurate forecast; the independent model is shown alongside as a second witness.</div>
+  </div>`;
+}
+
+function availabilitySection(rep) {
+  const f = rep.fpl;
+  if (!f || !f.home || !f.away) return '';
+  const side = (r, name) => `<div class="av-side"><div class="av-h">${esc(name)} <span>${pct(r.attackLoss, 0)} of attacking output unavailable${r.gkOut ? ' · keeper out' : ''}</span></div>
+    ${r.keyOut.length ? r.keyOut.map((p) => `<div class="av-p out"><b>${esc(p.name)}</b> ${esc(p.pos)} · ${p.chance}% <em>${esc(p.news || '')}</em></div>`).join('') : '<div class="av-p">No regular ruled out.</div>'}
+    ${r.doubtful.map((p) => `<div class="av-p doubt"><b>${esc(p.name)}</b> ${esc(p.pos)} · ${p.chance}% <em>${esc(p.news || '')}</em></div>`).join('')}
+  </div>`;
+  return `<div class="sec"><div class="sec-title">Availability <span class="pill">Fantasy Premier League · club-fed</span></div>
+    <div class="av">${side(f.home, rep.match.home.name)}${side(f.away, rep.match.away.name)}</div></div>`;
 }
 
 function modelSection(rep) {
@@ -477,8 +580,15 @@ function formSection(rep) {
 function provenanceSection(rep) {
   const p = rep.dataProvenance;
   const s = rep.baseline.source || '';
+  const rs = p.results && p.results.home;
+  const vs = p.historyVerifiedShare;
   return `<div class="sec"><div class="sec-title">Data provenance</div>
     <div class="prov">
+      ${rs ? `<span class="${rs.verifiedShare >= 0.7 ? 'ok' : 'warn'}">${rs.n} league results · ${pct(rs.verifiedShare, 0)} verified by 2+ sources (${esc((rs.sources || []).join(', '))})</span>` : '<span class="warn">no verified results history</span>'}
+      ${vs != null ? `<span class="${vs >= 0.7 ? 'ok' : 'warn'}">team evidence ${pct(vs, 0)} cross-verified</span>` : ''}
+      <span class="${p.hasRatings ? 'ok' : 'warn'}">${p.hasRatings ? 'results ratings fitted' : 'no results ratings'}</span>
+      <span class="${p.nBooks >= 2 ? 'ok' : p.nBooks ? '' : 'warn'}">${p.nBooks ? p.nBooks + ' bookmaker source(s)' : 'no bookmaker price'}</span>
+      ${p.hasFpl ? '<span class="ok">FPL availability</span>' : ''}
       <span class="${p.hasXg ? 'ok' : 'warn'}">${p.hasXg ? 'xG/xGA available' : 'goals-based only (no xG in this league)'}</span>
       <span class="${p.hasH2h ? 'ok' : 'warn'}">${p.hasH2h ? 'H2H loaded' : 'no H2H history'}</span>
       <span class="${p.hasForm ? 'ok' : 'warn'}">${p.hasForm ? 'form loaded' : 'no recent form'}</span>
@@ -530,12 +640,13 @@ function bindDetail() {
 /* ---------------------------------------------------------- methodology helpers */
 
 const STATUS_META = {
-  LOCK:    { cls: 'lock',    label: 'Lock',       blurb: 'Every gate passed and the price shows a real edge.' },
-  PREDICT: { cls: 'predict', label: 'Predict',    blurb: 'Every gate passed. No verified price edge, so check your own bookmaker.' },
+  LOCK:    { cls: 'lock',    label: 'Lock',       blurb: 'Every gate passed AND a real bookmaker price beats the multi-book fair price by 3% or more.' },
+  PREDICT: { cls: 'predict', label: 'Predict',    blurb: 'Every gate passed. Only bet it at your bookmaker if the price is at or above the "take at" price.' },
   PAPER:   { cls: 'paper',   label: 'Paper only', blurb: 'Qualifies on the data, but this market has not earned real stakes. Track it first.' },
   WATCH:   { cls: 'watch',   label: 'Watch',      blurb: 'Close, but not enough evidence to call it.' },
   REMOVE:  { cls: 'remove',  label: 'No',         blurb: 'Fails a hard gate or too few checks.' },
 };
+const CONF_CLS = { High: 'lock', Medium: 'predict', Low: 'watch' };
 const statusMeta = (s) => STATUS_META[s] || STATUS_META.REMOVE;
 const signed = (v, dp = 1) => (v == null ? '—' : (v > 0 ? '+' : '') + v.toFixed(dp));
 
@@ -546,6 +657,12 @@ function statusBadge(p) {
 
 function priceLine(p) {
   const pr = p.price || {};
+  if (pr.valuePrice != null) {
+    // v5: the number that matters to the user is the price they need at THEIR bookmaker.
+    const best = pr.best ? ` · best <b>${dec(pr.best)}</b>${pr.bestBook ? ' ' + esc(pr.bestBook) : ''}` : '';
+    const tag = pr.state === 'value' ? ' · <b class="pos">value</b>' : pr.state === 'too-short' ? ' · too short' : '';
+    return `take at <b>≥ ${dec(pr.valuePrice)}</b>${best}${tag}`;
+  }
   if (pr.state === 'edge') return `<b>${dec(pr.price)}</b> · edge ${dec(pr.ratio)}x`;
   if (pr.price) return `<b>${dec(pr.price)}</b> · ${esc(pr.state === 'too-short' ? 'too short' : 'no edge')}`;
   return `fair <b>${dec(p.fairOdds)}</b> · no quote`;
@@ -566,8 +683,10 @@ function predCard(item, withMethod) {
     ${withMethod ? `<div class="pc-method">${esc(p.name)} · v${esc(p.version)}</div>` : ''}
     <div class="pc-stats">
       <span>Prob <b>${pct(p.prob, 0)}</b></span>
+      <span>Fair <b>${dec(p.fairOdds)}</b></span>
       <span>${priceLine(p)}</span>
       <span>Checks <b>${p.checklist.passed}/${p.checklist.known}</b></span>
+      ${p.modelProb != null ? `<span title="Independent model (ratings + xG + Elo, no bookmaker price)">Model <b>${pct(p.modelProb, 0)}</b></span>` : ''}
     </div>
     ${why ? `<div class="pc-why">${esc(why)}</div>` : ''}
     ${p.paperOnly ? `<div class="pc-paper">Paper only: log it, do not stake.</div>` : ''}
@@ -614,7 +733,7 @@ function methodologySection(rep) {
 
   if (!h) {
     html += `<div class="no-banker"><strong>No market qualifies</strong>
-      This match does not fall under any of the eleven methodologies. Nothing has been forced.</div>`;
+      This match does not fall under any of the ${mt.all.length} methodologies. Nothing has been forced — the general prediction above still gives the engine's view.</div>`;
   } else {
     const m = statusMeta(h.status);
     html += `<div class="verdict st-${m.cls}">
@@ -623,9 +742,10 @@ function methodologySection(rep) {
       <div class="v-sub">${esc(h.name)} · model ${pct(h.prob)} (calibrated) · fair odds ${dec(h.fairOdds)}</div>
       <div class="v-stats">
         <div><div class="v">${pct(h.prob, 0)}</div><div class="k">Probability</div></div>
-        <div><div class="v">${h.price && h.price.price ? dec(h.price.price) : '—'}</div><div class="k">${h.price && h.price.price ? 'Book price' : 'No quote'}</div></div>
+        <div><div class="v">${h.price && h.price.valuePrice ? '≥ ' + dec(h.price.valuePrice) : h.price && h.price.price ? dec(h.price.price) : '—'}</div><div class="k">${h.price && h.price.valuePrice ? 'Take at' : h.price && h.price.price ? 'Book price' : 'No quote'}</div></div>
         <div><div class="v">${h.checklist.passed}/${h.checklist.known}</div><div class="k">Checks passed</div></div>
       </div>
+      ${h.line35 ? `<div class="v-line35">${esc(h.line35)}</div>` : ''}
       <div class="v-note">${esc(m.blurb)} ${h.price && h.price.note ? esc(h.price.note) : ''}</div>
       ${h.paperOnly ? `<div class="v-paper">Paper only: record the result, do not stake real money until the sample proves it.${h.stake ? ' If tracking, ' + esc(h.stake) + '.' : ''}</div>` : ''}
     </div>`;
@@ -644,7 +764,7 @@ function methodologySection(rep) {
   html += `</div>`;
 
   // every methodology, with its gates and checklist on demand
-  html += `<div class="sec"><div class="sec-title">All eleven methodologies <span class="pill">tap to inspect</span></div>`;
+  html += `<div class="sec"><div class="sec-title">All ${mt.all.length} methodologies <span class="pill">tap to inspect</span></div>`;
   for (const r of mt.all) {
     const m = statusMeta(r.status);
     html += `<details class="mrow st-${m.cls}">
@@ -655,6 +775,7 @@ function methodologySection(rep) {
         <span class="mr-prob">${r.prob == null ? '—' : pct(r.prob, 0)}</span>
       </summary>
       <div class="mbody">
+        ${r.line35 ? `<div class="v-line35">${esc(r.line35)}</div>` : ''}
         ${r.failedGates && r.failedGates.length ? `<div class="mfail">Failed hard gate: ${esc(r.failedGates.join(', '))}</div>` : ''}
         <div class="mh">Hard gates</div>${gateList(r.gates)}
         <div class="mh">Checklist <span>${r.checklist.passed}/${r.checklist.known} passed · needs ${Math.round(r.checklist.need * 100)}%${r.checklist.thin ? ' · too few known items' : ''}</span></div>${checkList(r.checklist.items)}
@@ -673,7 +794,7 @@ async function loadPredictions(force) {
   if (state.preds && !force && state.preds.date === state.date) return state.preds;
   setStatus('analysing the day…', 'busy');
   state.preds = await api(`/api/predictions?date=${encodeURIComponent(state.date)}&limit=60`);
-  setStatus(`${state.preds.predicted} predictions from ${state.preds.analysable} fixtures`, 'ok');
+  setStatus(`${(state.preds.general || []).length} fixtures predicted · ${state.preds.predicted} methodology picks`, 'ok');
   return state.preds;
 }
 
@@ -761,9 +882,10 @@ function renderTop() {
         <div><div class="v">${p.score}</div><div class="k">Score</div></div>
         <div><div class="v">${pct(p.prob)}</div><div class="k">Probability</div></div>
         <div><div class="v">${dec(p.fairOdds)}</div><div class="k">Fair odds</div></div>
-        <div><div class="v">${p.price && p.price.price ? dec(p.price.price) : '—'}</div><div class="k">${p.price && p.price.price ? 'Book price' : 'No quote'}</div></div>
+        <div><div class="v">${p.price && p.price.valuePrice ? '≥ ' + dec(p.price.valuePrice) : p.price && p.price.price ? dec(p.price.price) : '—'}</div><div class="k">${p.price && p.price.valuePrice ? 'Take at' : p.price && p.price.price ? 'Book price' : 'No quote'}</div></div>
         <div><div class="v">${p.checklist.passed}/${p.checklist.known}</div><div class="k">Checks</div></div>
       </div>
+      ${p.line35 ? `<div class="v-line35">${esc(p.line35)}</div>` : ''}
       ${p.support && p.support.length ? `<div class="th-h">Why it qualifies</div><ul class="th-list ok">${p.support.slice(0, 6).map((s) => `<li>${esc(s)}</li>`).join('')}</ul>` : ''}
       ${downside.length ? `<div class="th-h">How it could lose</div><ul class="th-list no">${downside.slice(0, 6).map((s) => `<li>${esc(s)}</li>`).join('')}</ul>` : ''}
       <div class="th-foot">${esc(sm.blurb)}${p.price && p.price.note ? ' ' + esc(p.price.note) : ''}</div>
@@ -787,37 +909,132 @@ async function renderMethod() {
   }
   const d = state.method;
   const c = d.config || {};
-  const fam = {};
-  for (const m of d.methods) (fam[m.family] = fam[m.family] || []).push(m);
+  const bt = d.backtest || {};
+  const cell = (x) => (x ? `${pct(x.hitRate, 1)} <small>said ${pct(x.statedProb, 1)} · n ${x.n.toLocaleString()}</small>` : '<small>—</small>');
+  const roi = (x) => (x && x.roiBestPrice != null ? `<span class="${x.roiBestPrice >= 0 ? 'pos' : 'neg'}">${(x.roiBestPrice * 100).toFixed(1)}%</span>` : '—');
+  const roi365 = (x) => (x && x.roiBet365 != null ? `<span class="${x.roiBet365 >= 0 ? 'pos' : 'neg'}">${(x.roiBet365 * 100).toFixed(1)}%</span>` : '—');
   el.innerHTML = `<div class="m-intro">
-      <h2>How predictions are made</h2>
-      <p>Every fixture is run through <b>${d.methods.length} market methodologies</b>. A methodology only speaks when the match
-      genuinely falls under it: all hard gates must pass (unknown evidence counts as a fail), then at least
-      <b>${Math.round((c.qualify || 0.85) * 100)}%</b> of its checklist must pass. Where two qualifying picks contradict, the weaker is set aside.</p>
+      <h2>How predictions are made — v${esc(d.version)}</h2>
+      <p>Every fixture gets a <b>general prediction</b> (result, goals, both-teams-to-score and a predicted final score) from one
+      calibrated, market-anchored model. Then <b>${d.methods.length} market methodologies</b> decide which markets the match genuinely falls under:
+      all hard gates must pass (unknown evidence counts as a fail), then at least <b>${Math.round((c.qualify || 0.85) * 100)}%</b> of the checklist.
+      Contradicting picks are resolved; the weaker is set aside.</p>
+      <p><b>What changed in v5, and why.</b> The probabilities now come from a blend of the multi-book bookmaker consensus (90%), a
+      results-based Dixon-Coles rating fitted on cross-verified results, ESPN xG and ClubElo — then calibrated on real results and tested on seasons the calibration never saw.
+      A <b>Lock</b> now needs a real price that beats the multi-book fair price; a model that merely disagrees with the bookmakers
+      lost money in testing, so it no longer counts as an edge. Every prediction shows the price you need at your own bookmaker.</p>
       <div class="ladder">
-        ${['LOCK', 'PREDICT', 'PAPER', 'WATCH', 'REMOVE'].map((s) => `<div class="lad st-${statusMeta(s).cls}"><b>${statusMeta(s).label}</b><span>${esc(statusMeta(s).blurb)}</span></div>`).join('')}
+        ${['LOCK', 'PREDICT', 'PAPER', 'WATCH', 'REMOVE'].map((st) => `<div class="lad st-${statusMeta(st).cls}"><b>${statusMeta(st).label}</b><span>${esc(statusMeta(st).blurb)}</span></div>`).join('')}
       </div>
     </div>
+    ${bt.headline ? `<div class="sec-title">Tested on real results <span class="pill">${esc(bt.heldOut || '')}</span></div>
+    <div class="bt-hero">
+      <div><div class="v">${pct(bt.headline.v5.hitRate, 1)}</div><div class="k">Top pick per fixture hit rate (v5)<br>said ${pct(bt.headline.v5.statedProb, 1)} · ${bt.headline.v5.n.toLocaleString()} picks</div></div>
+      <div><div class="v muted">${pct(bt.headline.v4.hitRate, 1)}</div><div class="k">Same test, v4 code<br>said ${pct(bt.headline.v4.statedProb, 1)} · ${bt.headline.v4.n.toLocaleString()} picks</div></div>
+      <div><div class="v">${pct(bt.general.bestBet.hitRate, 1)}</div><div class="k">General best bet, every fixture<br>said ${pct(bt.general.bestBet.statedProb, 1)}</div></div>
+      <div><div class="v">${pct(bt.general.predictedScore.exact, 1)}</div><div class="k">Predicted score exactly right<br>(single likeliest score ${pct(bt.general.mostLikelyScore.exact, 1)})</div></div>
+    </div>
+    <div class="bt-note">${esc(bt.dataset || '')}. Held-out seasons were never used to fit a v5 parameter. "Said" is the average stated probability: when hit ≈ said, the percentages on this site can be taken at face value.</div>` : ''}
     <div class="sec-title">The methodologies <span class="pill">${d.methods.length}</span></div>
-    <div class="mgrid">${d.methods.map((m) => `<div class="mcard">
-      <div class="mc-top"><b>${esc(m.name)}</b><span>v${esc(m.version)}</span></div>
-      <div class="mc-fam">${esc(m.family)}</div>
-      <div class="mc-stats">
-        <span>Probability floor <b>${m.floor != null ? pct(m.floor, 0) : '—'}</b></span>
-        <span>Sample <b>≥ ${m.minSample}</b></span>
-        ${m.paperOnly ? '<span class="mc-paper">Paper only</span>' : ''}
-        ${m.maxLegs ? `<span>Max legs <b>${m.maxLegs}</b></span>` : ''}
-      </div></div>`).join('')}</div>
+    <div class="bt-table">
+      <div class="bt-row head"><span>Methodology</span><span>Floor</span><span>v5 hit rate (held-out)</span><span>v4 hit rate</span><span>ROI Bet365</span><span>ROI best price</span></div>
+      ${d.methods.map((m) => `<div class="bt-row">
+        <span><b>${esc(m.name)}</b> <small>v${esc(m.version)}${m.paperOnly ? ' · paper only' : ''}${m.headline === false ? ' · not a headline' : ''}${m.stake ? ' · ' + esc(m.stake) : ''}</small></span>
+        <span>${m.floor != null ? pct(m.floor, 0) : '—'}</span>
+        <span>${cell(m.backtest && m.backtest.v5)}</span>
+        <span>${cell(m.backtest && m.backtest.v4)}</span>
+        <span>${roi365(m.backtest && m.backtest.v5)}</span>
+        <span>${roi(m.backtest && m.backtest.v5)}</span>
+      </div>`).join('')}
+    </div>
     <div class="m-honest">
-      <h3>What the evidence says</h3>
+      <h3>What the evidence says — plainly</h3>
       <ul>
-        <li><b>Probabilities are calibrated.</b> Goal-market probabilities are recalibrated on 2023–24 results and checked on held-out 2025 matches. Stated 66.8% hit 66.5% in testing.</li>
-        <li><b>Draw is paper only.</b> In the walk-forward backtest the draw model had no predictive value, so it never produces a stake-worthy pick.</li>
-        <li><b>The gates add real value for BTTS</b> and little for Over/Under 2.5. They are kept because they stop obviously bad spots.</li>
-        <li><b>GG/NG 2+ stays on paper</b> until 40 tracked legs prove it. It cannot be tested from results alone.</li>
-        <li><b>Price edge is untested.</b> There is no free historical odds feed, so profit is not proven. Use fair odds as a guide and compare with your own bookmaker.</li>
+        <li><b>The percentages are honest.</b> Across every methodology the held-out hit rate sits close to the stated probability.</li>
+        <li><b>Accuracy is not profit.</b> At Bet365 prices no methodology made a reliable profit; with the best price across ~17 books several are around break-even or slightly positive. Always shop for the price, and never bet below the "take at" price shown.</li>
+        <li><b>The bookmakers are the sharpest forecast.</b> When our independent model disagrees with them, the bookmakers were usually right — so disagreement is shown as a warning, not as value.</li>
+        <li><b>GG/NG 2+ stays paper-only</b> until the live track record shows 40 settled legs at or above their stated probability with a profit.</li>
+        <li><b>Correct scores are long shots.</b> Even a qualifying final-score pick lands about one time in six. Quarter stake, single only.</li>
         <li><b>No outcome is guaranteed.</b> Analytical output only.</li>
       </ul>
+    </div>`;
+}
+
+/* ---------------------------------------------------------- every-match (general) view */
+
+function renderGeneral() {
+  const el = $('#board');
+  const d = state.preds;
+  if (!d) { el.innerHTML = loadingBlock('Predicting every fixture…', 'General prediction, predicted score and best bet for each match.'); return; }
+  const list = (d.general || []).filter((x) => state.filter.conf === 'all' || x.general.confidence.level === state.filter.conf);
+  const counts = { High: 0, Medium: 0, Low: 0 };
+  for (const x of d.general || []) counts[x.general.confidence.level]++;
+  let html = `<div class="filters">
+    ${['all', 'High', 'Medium', 'Low'].map((c) => `<button class="fchip ${state.filter.conf === c ? 'is-active' : ''}" data-c="${c}">${c === 'all' ? 'All fixtures' : c + ' confidence'} <b>${c === 'all' ? (d.general || []).length : counts[c]}</b></button>`).join('')}
+  </div>`;
+  if (!list.length) {
+    el.innerHTML = html + `<div class="empty"><h3>No fixtures</h3><p>Nothing analysable for this filter on ${esc(fmtDateLong(state.date))}.</p></div>`;
+  } else {
+    html += `<div class="ggrid">${list.map((x) => {
+      const g = x.general;
+      const m = x.match;
+      const bb = g.bestBet;
+      return `<div class="gcard" data-id="${esc(m.id)}" data-league="${esc(m.league)}" data-year="${esc(m.seasonYear || '')}">
+        <div class="pc-top"><span class="pc-league">${esc(m.leagueFlag || '')} ${esc(m.leagueName)} · ${esc(fmtTime(m.date))}</span>
+          <span class="badge st-${CONF_CLS[g.confidence.level] || 'watch'}">${esc(g.confidence.level)}</span></div>
+        <div class="gc-match"><span>${esc(m.home.name)}</span><b>${g.score.predicted.home} – ${g.score.predicted.away}</b><span>${esc(m.away.name)}</span></div>
+        <div class="gc-calls">
+          <span>${esc(g.result.label)} <b>${pct(g.result.prob, 0)}</b></span>
+          <span>${esc(g.goals.call)} 2.5 <b>${pct(g.goals.prob, 0)}</b></span>
+          <span>BTTS ${esc(g.btts.call)} <b>${pct(g.btts.prob, 0)}</b></span>
+        </div>
+        ${bb ? `<div class="gc-best"><span class="gc-k">${g.source === 'methodology' ? esc(statusMeta(bb.status).label) + ' · ' + esc(bb.methodology) : 'Best bet'}</span>
+          <b>${esc(bb.label)}</b> ${pct(bb.prob, 0)} · take at ≥ ${dec(bb.valuePrice)}</div>` : ''}
+      </div>`;
+    }).join('')}</div>`;
+    el.innerHTML = html;
+  }
+  $$('.fchip', el).forEach((b) => b.addEventListener('click', () => { state.filter.conf = b.dataset.c; renderGeneral(); }));
+  $$('.gcard', el).forEach((c) => c.addEventListener('click', () => openMatch(c.dataset.id, c.dataset.league, c.dataset.year)));
+}
+
+/* ---------------------------------------------------------- track record view */
+
+async function renderRecord() {
+  const el = $('#board');
+  el.innerHTML = loadingBlock('Loading the track record…', 'Settling finished matches from ESPN results.');
+  let d;
+  try {
+    d = await api('/api/ledger');
+  } catch (err) {
+    el.innerHTML = `<div class="err-box"><strong>Could not load the track record</strong><br>${esc(err.message)}</div>`;
+    return;
+  }
+  const disc = d.discipline;
+  const pm = Object.entries(d.perMethod || {}).sort((a, b) => b[1].n - a[1].n);
+  const flag = (on, title, body) => `<div class="dflag ${on ? 'on' : ''}"><b>${esc(title)}</b><span>${body}</span></div>`;
+  el.innerHTML = `<div class="m-intro"><h2>Track record</h2>
+      <p>Every prediction is written down <b>before kick-off</b> and settled from the final score afterwards. Nothing is edited after a match starts.
+      ${d.entries ? `${d.entries.toLocaleString()} entries so far.` : 'No entries yet — the record starts with the first day you load predictions.'}
+      <a class="dl" href="/api/ledger?format=csv">Download CSV</a></p>
+      <p class="muted-t">On free hosting the record survives restarts but not redeploys. Download the CSV regularly to keep it.</p></div>
+    <div class="dflags">
+      ${flag(disc.rule17.active, 'Rule 17 · stop-loss', disc.rule17.active ? `COOLDOWN until ${esc(disc.rule17.cooldownUntil)} — paper-trade only.` : `${disc.rule17.consecutiveLossDays} losing day(s) in a row on the daily top pick. 3 in a row triggers a 5-day cooldown.`)}
+      ${flag(disc.rule27.active, 'Rule 27 · streak anchoring', disc.rule27.active ? `${disc.rule27.consecutiveWinDays} winning days in a row — drop the next pick's confidence one level. Same stake.` : `${disc.rule27.consecutiveWinDays} winning day(s) in a row.`)}
+      ${flag(disc.rule34.readyForRealMoney, 'Rule 34 · GG/NG 2+ record', `${disc.rule34.legs}/40 legs settled${disc.rule34.hitRate != null ? ` · hit ${pct(disc.rule34.hitRate, 0)} v stated ${pct(disc.rule34.avgStatedProb, 0)}` : ''}. ${disc.rule34.readyForRealMoney ? 'Eligible for real stakes (1 unit, max 2 legs).' : 'Paper only.'}`)}
+    </div>
+    <div class="sec-title">By methodology</div>
+    ${pm.length ? `<div class="bt-table">
+      <div class="bt-row head"><span>Methodology</span><span>Settled</span><span>Hit rate</span><span>Stated</span><span>ROI at best price</span><span>Pending</span></div>
+      ${pm.map(([k, v]) => `<div class="bt-row"><span><b>${esc(v.name)}</b></span><span>${v.n}</span><span>${v.hitRate == null ? '—' : pct(v.hitRate, 1)}</span><span>${v.avgProb == null ? '—' : pct(v.avgProb, 1)}</span>
+        <span>${v.roiAtBestPrice == null ? '—' : `<span class="${v.roiAtBestPrice >= 0 ? 'pos' : 'neg'}">${(v.roiAtBestPrice * 100).toFixed(1)}%</span> <small>n ${v.priced}</small>`}</span><span>${v.pending}</span></div>`).join('')}
+    </div>` : '<div class="empty"><p>No settled predictions yet.</p></div>'}
+    <div class="sec-title" style="margin-top:18px">Latest entries</div>
+    <div class="bt-table">
+      <div class="bt-row head"><span>Match</span><span>Pick</span><span>Prob</span><span>Result</span><span></span><span></span></div>
+      ${(d.recent || []).map((e) => `<div class="bt-row"><span>${esc(e.home)} v ${esc(e.away)} <small>${esc(String(e.date).slice(0, 10))} · ${esc(e.leagueName || '')}</small></span>
+        <span>${esc(e.label || e.key)} <small>${esc(e.methodName || '')}</small></span><span>${pct(e.prob, 0)}</span>
+        <span>${e.result ? esc(e.result) : '<small>pending</small>'}</span><span>${e.hit === 1 ? '<b class="pos">✓</b>' : e.hit === 0 ? '<b class="neg">✕</b>' : e.result ? 'void' : ''}</span><span></span></div>`).join('')}
     </div>`;
 }
 
@@ -845,11 +1062,13 @@ async function loadBoard() {
 function renderPredView() {
   if (state.view === 'predictions') renderPredictions();
   else if (state.view === 'top') renderTop();
+  else if (state.view === 'general') renderGeneral();
 }
 
 async function refresh() {
   if (state.view === 'matches') return loadBoard();
   if (state.view === 'method') return renderMethod();
+  if (state.view === 'record') return renderRecord();
   try {
     await loadPredictions(true);
     renderPredView();
@@ -863,10 +1082,11 @@ function setView(view) {
   state.view = view;
   $$('.tab').forEach((t) => t.classList.toggle('is-active', t.dataset.view === view));
   $('#bankersOnly').parentElement.style.display = view === 'matches' ? '' : 'none';
-  $('.datebar').classList.toggle('is-muted', view === 'method');
+  $('.datebar').classList.toggle('is-muted', view === 'method' || view === 'record');
 
   if (view === 'matches') { loadBoard(); return; }
   if (view === 'method') { renderMethod(); return; }
+  if (view === 'record') { renderRecord(); return; }
 
   renderPredView(); // shows the loading block until data arrives
   loadPredictions(false)
