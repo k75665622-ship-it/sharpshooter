@@ -13,6 +13,7 @@
  *   GET /api/analysis?league=&event=  -> full deep report for one match
  *   GET /api/bankers?date=&limit=     -> legacy banker election (superseded by predictions)
  *   GET /api/predictions?date=&limit= -> methodology predictions across the day, grouped by market
+ *   GET /api/price-backtest           -> profit backtest on real historical odds (runs in background; ?format=json)
  *   GET /api/sources-check            -> probes candidate free data sources from this server
  *   GET /api/methodology              -> the eleven market methodologies and their thresholds
  */
@@ -343,6 +344,19 @@ const server = http.createServer(async (req, res) => {
 
     if (p === '/api/sources-check') {
       return json(res, 200, await require('./lib/sourcecheck').checkSources());
+    }
+
+    if (p === '/api/price-backtest') {
+      const PB = require('./lib/pricebacktest');
+      const cur = PB.getJob();
+      if (url.searchParams.get('start') || url.searchParams.get('restart') || (cur.status === 'idle' && !url.searchParams.get('peek'))) {
+        const leagues = (url.searchParams.get('leagues') || '').split(',').map((x) => x.trim().toUpperCase()).filter(Boolean);
+        PB.startJob(leagues);
+      }
+      const j = PB.getJob();
+      if (url.searchParams.get('format') === 'json') return json(res, 200, j);
+      res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' });
+      return res.end(PB.formatReport(j));
     }
 
     if (p === '/api/leagues') {

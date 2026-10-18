@@ -7,13 +7,14 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "verify": "node test_crosscheck.js && node test_consensus_price.js && node test_news.js && node test_quota.js && node test_methodology.js",
+    "verify": "node test_crosscheck.js && node test_consensus_price.js && node test_news.js && node test_quota.js && node test_methodology.js && node test_pricebacktest.js",
     "test:engine": "node test_engine.js",
     "test:board": "node test_board.js",
     "test:quota": "node test_quota.js",
     "test:methodology": "node test_methodology.js",
     "backtest": "node backtest_methodology.js",
-    "check:sources": "node lib/sourcecheck.js"
+    "check:sources": "node lib/sourcecheck.js",
+    "test:pricebacktest": "node test_pricebacktest.js"
   },
   "engines": {
     "node": ">=18"
