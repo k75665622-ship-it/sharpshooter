@@ -1,0 +1,124 @@
+{
+  "version": "5.0",
+  "source": "research/ on 46,121 fixtures (18 European divisions, Bet365 odds, 2019-20..2026-27). Methods validated on held-out 2023-26 after fitting on 2019-23; production constants then refitted on all seasons.",
+  "elo": {
+    "k": 0.7,
+    "homeAdv": 50
+  },
+  "weights": {
+    "marketShare": 0.9,
+    "marketShareMeasuredOptimum": 1,
+    "model": {
+      "ratings": 0.3,
+      "xg": 0.35,
+      "elo": 0.35
+    }
+  },
+  "calibration": {
+    "withMarket": {
+      "1": {
+        "a": -0.01,
+        "b": 1.08
+      },
+      "2": {
+        "a": 0.01,
+        "b": 1.08
+      },
+      "O1.5": {
+        "a": -0.05,
+        "b": 1.06
+      },
+      "O2.5": {
+        "a": 0.02,
+        "b": 1.02
+      },
+      "BTTS_Y": {
+        "a": 0.08,
+        "b": 0.9
+      },
+      "GG2P": {
+        "a": -0.33,
+        "b": 0.78
+      },
+      "X": {
+        "a": 0.25,
+        "b": 1.16
+      },
+      "TTH_O1.5": {
+        "a": 0.02,
+        "b": 1.06
+      },
+      "TTA_O1.5": {
+        "a": 0,
+        "b": 0.98
+      },
+      "TTH_O0.5": {
+        "a": -0.02,
+        "b": 1.08
+      },
+      "TTA_O0.5": {
+        "a": 0.04,
+        "b": 1.02
+      },
+      "WIN2": {
+        "a": -0.12,
+        "b": 1.02
+      }
+    },
+    "modelOnly": {
+      "1": {
+        "a": 0.09,
+        "b": 1.22
+      },
+      "2": {
+        "a": 0.13,
+        "b": 1.26
+      },
+      "O1.5": {
+        "a": 0.24,
+        "b": 0.8
+      },
+      "O2.5": {
+        "a": 0.04,
+        "b": 0.78
+      },
+      "O3.5": {
+        "a": -0.21,
+        "b": 0.76
+      },
+      "BTTS_Y": {
+        "a": 0.06,
+        "b": 0.66
+      },
+      "GG2P": {
+        "a": -0.4,
+        "b": 0.76
+      },
+      "X": {
+        "a": 0.07,
+        "b": 1.04
+      },
+      "TTH_O1.5": {
+        "a": 0.05,
+        "b": 1.04
+      },
+      "TTH_O0.5": {
+        "a": -0.01,
+        "b": 1.08
+      },
+      "TTA_O0.5": {
+        "a": -0.05,
+        "b": 1.08
+      },
+      "WIN2": {
+        "a": -0.03,
+        "b": 1.04
+      }
+    }
+  },
+  "score": {
+    "drawInflation": 1.1,
+    "rho": 6.938893903907228e-18
+  },
+  "fittedOn": "all seasons 2019-20..2026-27 (method validated first on held-out 2023-26)"
+}

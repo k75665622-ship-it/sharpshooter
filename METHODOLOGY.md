@@ -1,144 +1,87 @@
-# Sharpshooter methodologies (v4.0)
+# Sharpshooter methodologies (v5.0)
 
-Eleven market methodologies decide what the site predicts. This document is the
-plain-English reference for them. The code is in `lib/methodology/`, and
-`GET /api/methodology` returns the live thresholds.
+Thirteen market methodologies decide what the site predicts, and a general prediction covers every fixture.
+This is the plain-English reference. The full playbooks — written in the style of the original v3.0 / v3.1 /
+v2.5 personal playbooks, one per market — are in [`methodology/`](methodology/). The code is in
+`lib/methodology/`, and `GET /api/methodology` returns the live thresholds and backtest record.
 
-The first five are built from the four methodologies supplied for this project
-(Over 2.5 v2.0, Under 2.5 v2.5, BTTS No v2.5, GG/NG 2+ v3.1) plus a BTTS Yes
-counterpart. The other six (Home Win, Draw, Away Win, Team Total Goals, Underdog
-Handicap +, Favourite Handicap −) were written in the same style.
+| Playbook | Markets |
+|---|---|
+| [`00-CORE-v5.md`](methodology/00-CORE-v5.md) | The shared rules (1–42), the status ladder, staking, the daily process |
+| [`OVER-2.5-v5.md`](methodology/OVER-2.5-v5.md) | Over 2.5 (from v3.0) |
+| [`UNDER-2.5-v5.md`](methodology/UNDER-2.5-v5.md) | Under 2.5 (from v2.5 UNDER) — redesigned |
+| [`BTTS-v5.md`](methodology/BTTS-v5.md) | BTTS No (from v2.5 BTTS NO) and BTTS Yes |
+| [`GG-NG-2PLUS-v5.md`](methodology/GG-NG-2PLUS-v5.md) | GG/NG 2+ (from v3.1) |
+| [`RESULTS-v5.md`](methodology/RESULTS-v5.md) | Home Win, Away Win, Draw, Double Chance (new) |
+| [`TEAM-TOTALS-AND-HANDICAPS-v5.md`](methodology/TEAM-TOTALS-AND-HANDICAPS-v5.md) | Team Totals, Underdog +, Favourite − |
+| [`FINAL-SCORE-AND-GENERAL-v5.md`](methodology/FINAL-SCORE-AND-GENERAL-v5.md) | Final Score (new) and the General Prediction (new) |
 
 ## How a prediction is made
 
-For each fixture the engine builds one evidence view (model, per-game history,
-Elo, news, bookmaker price), then runs all eleven methodologies against it.
+1. **One forecast.** The multi-book bookmaker consensus (Rule 37) is blended 90/10 with an independent model
+   (Dixon-Coles ratings on cross-verified results, ESPN xG, ClubElo). The result is one score matrix, so no two
+   markets can contradict each other.
+2. **Calibrated numbers** (Rule 40). Every market probability is calibrated on real results and was checked on
+   seasons the calibration never saw. A stated 65% lands about 65% of the time.
+3. **Hard gates.** Every gate must pass. Unknown evidence fails (fail closed).
+4. **Checklist.** At least 85% of the known items must pass, with at least 60% of items known. Every checklist
+   includes the **independent witness** (Rule 42): the model with no price in it must not contradict the pick.
+5. **Status ladder.**
+   - **LOCK** — qualifies **and** a real bookmaker price beats the multi-book fair price by ≥ 3% (30–75% band,
+     ≥ 2 books). (Rule 39)
+   - **PREDICT** — qualifies. Bet only at your bookmaker's price ≥ the **take-at** price.
+   - **PAPER** — qualifies, market not yet proven (GG/NG 2+).
+   - **WATCH / REMOVE** — close / failed, with reasons.
+6. **Contradictions** between qualifying picks are resolved; the weaker is set aside with the reason.
+7. **Headline** — the strongest surviving prediction per fixture (the Final Score and Draw never take it).
+8. **General prediction** — result, double chance, goals, BTTS, predicted final score, best bet and confidence,
+   for **every** analysable fixture.
+9. **Track record** — every pre-match prediction is recorded and settled afterwards; Rules 17, 27 and 34 are
+   enforced from it.
 
-1. **Hard gates.** Every gate must pass. A gate whose evidence is unknown **fails**
-   (fail closed), so missing data can never produce a prediction.
-2. **Checklist.** Each methodology scores a list of soft checks. A check passes at
-   0.5 or more. Qualification needs **at least 85%** of the *known* checks to pass,
-   and at least 60% of the checks must be known.
-3. **Status ladder.** `LOCK` > `PREDICT` > `PAPER` > `WATCH` > `REMOVE`.
-   - **LOCK**: gates and checklist pass, and a real bookmaker price shows an edge.
-   - **PREDICT**: gates and checklist pass; no verified price edge.
-   - **PAPER**: qualifies, but the market is on probation (see below). Log it, do not stake.
-   - **WATCH**: close, but too thin or just under the pass ratio.
-   - **REMOVE**: a hard gate failed, or the checklist is far off.
-4. **Price test.** The edge needed scales with the price: `max(minRatio, 1 + 0.05 × price)`.
-   Prices under 1.25 are "too short" and never count as an edge.
-5. **Contradictions.** When two qualifying picks cannot both be right (Over and Under 2.5,
-   Home Win and Draw, BTTS No and GG 2+, a team to blank and BTTS Yes, and so on), the
-   higher-ranked one stays and the other is set aside, with the reason shown.
-6. **Headline.** The strongest surviving prediction per fixture, ranked by status then score.
+## What changed from v4, and why (all measured)
 
-## What was improved before applying it
+| Change | Evidence (held-out 2023-26 unless stated) |
+|---|---|
+| Market-anchored ensemble replaces the xG-only model | The de-vigged price was the most accurate forecast; v5's model components beat v4's formula on every market. |
+| New Dixon-Coles ratings on verified results | Beat the v4 season-average formula on 1X2, O/U, BTTS and exact-score log-loss. |
+| **LOCK = price beats consensus, not model beats price** | Betting model-vs-market disagreement lost 13–29%; price shopping in the 30–75% band was the only positive signal. |
+| Calibration of every market, refit on all seasons for production | Hit rate ≈ stated probability on every methodology. |
+| **Under 2.5 redesign** (Rule 38) | v4-style checks selected worse Unders; hit 57.5% → 61.7%, ROI −10.0% → −7.2%. |
+| BTTS No 1-1 trap becomes a checklist item | As a gate it removed ~75% of candidates with no accuracy gain. |
+| GG/NG 2+: measured haircut, two-reconstruction corroboration, achievable Rule 34 | v3.1's 0.88 haircut and "≥ 55% hit rate" lifting rule were not supported by the data. |
+| Draw published again (half stake, never headline) | Its probability is now honest: said 32.2%, hit 31.4%. |
+| Double Chance, Final Score and General Prediction added | DC 77.0% (said 76.0%); qualifying final scores 17.6% exact vs 11.7% base. |
+| Cross-verified results from 3 free sources (Rule 41) | Caught 97 wrong League Two scores and 2 wrong Portuguese results in openfootball. |
+| Premier League availability from Fantasy Premier League | Real chance-of-playing %, replacing headline guessing for that league. |
 
-| Change | Why |
-| --- | --- |
-| Probabilities are **recalibrated** (logistic fit on 2023–24, validated on held-out 2025) | The raw model was over-confident on goals markets. Stated 66.8% now hits 66.5%. |
-| Over/Under and Yes/No stay **complementary** after calibration | Prevents both sides of a market looking attractive. |
-| Floors are set on the **calibrated** probability (57% for the O/U and BTTS markets) | Floors mean what they say. |
-| **Pass ratio** (85%) replaces a summed score for qualification | A summed score let one strong item hide several failures. |
-| Unknown evidence **fails closed** and is counted separately | A thin sample can no longer qualify by default. |
-| **Streak rule** needs the streak to be backed by the model or Elo | Streak-chasing was the main source of bad favourites. |
-| **Elo** is an independent witness, waived when no rating is found | A second opinion that does not depend on the same results. |
-| **Edge multiple scales with price** and a 1.25 price floor | A flat margin over-rewarded very short prices. |
-| **Draw is paper-only** | The walk-forward backtest showed no predictive value. |
-| **GG/NG 2+ is paper-only**, max 2 legs, fixed 1-unit stake, 40 tracked legs before real money | It cannot be validated from results alone. |
-| **Contradiction resolver** | Two methodologies could otherwise publish opposite picks for one match. |
+## The record (held-out 2023-26, v5 code vs v4 code on the same matches)
 
-## The eleven methodologies
+| Methodology | v5 hit (stated) · picks | v4 hit (stated) · picks |
+|---|---|---|
+| Strongest pick per fixture | **71.6% (70.9%) · 9,114** | 66.7% (67.7%) · 6,577 |
+| Over 2.5 | 64.7% (65.5%) · 2,499 | 62.4% (62.0%) · 2,105 |
+| Under 2.5 | 61.7% (64.1%) · 925 | 57.5% (61.5%) · 532 |
+| BTTS Yes | 63.9% (62.1%) · 1,121 | 61.7% (61.0%) · 957 |
+| BTTS No | 57.4% (60.4%) · 61 | 60.6% (59.7%) · 33 |
+| Team Totals | 68.5% (68.9%) · 2,635 | 66.7% (70.9%) · 1,733 |
+| Home Win | 77.7% (75.8%) · 1,574 | 78.8% (75.3%) · 198 |
+| Away Win | 74.7% (72.6%) · 635 | 75.0% (71.3%) · 100 |
+| Draw | 31.4% (32.2%) · 245 | 33.5% (31.3%) · 206 |
+| Underdog + | 75.9% (72.8%) · 2,097 | 70.4% (71.8%) · 2,273 |
+| Favourite − | 70.4% (68.5%) · 477 | 67.0% (67.4%) · 109 |
+| Double Chance | 77.0% (76.0%) · 1,783 | — |
+| Final Score (exact) | 17.6% (15.0%) · 437 | — |
+| General best bet, every fixture | 73.6% (72.7%) · 19,043 | — |
 
-Numbers are the defaults in code. Where a market has several selections (team total
-per side, handicap lines), each selection has its own floor.
+## What the tests do NOT show
+- **Profit.** At Bet365 prices no methodology made a reliable profit; at the best of ~17 books several were
+  around break-even or slightly positive, with intervals that include zero. LOCK means "a price beats the
+  consensus", not "this will win".
+- **Team news, ESPN xG and rest days** do not exist in the historical data, so those gates were waived or
+  failed closed in the backtest. They can only make live picks stricter.
+- **The live free sources** (ESPN, football-data, FPL, ClubElo, InferSports) could not be reached from the
+  build environment; they are covered by offline tests in their exact live shapes (`test/e2e_offline.js`).
+  Watch the first live run.
 
-### Over 2.5 Goals
-Floor 57%, min edge 1.08×. Gates: two credible scoring pathways; no heavy favourite
-capping the total; no low-block side; no rotation or missing attackers on both sides;
-no Over streak the model does not support. Checks: both sides trending Over, expected
-total, head-to-head Over rate, leakiness, attacking intent, no cautious profile, league
-goals environment.
-
-### Under 2.5 Goals
-Floor 57%, min edge 1.08×. Gates: a named route to under three goals; no heavy favourite
-pushing for goals; no attacking chaos; no defender or keeper disruption on both sides;
-no long scoring streak the model backs. Checks: defensive strength, low expected total,
-Under form, head-to-head Under rate, clean-sheet habit, limited firepower, league environment.
-
-### Both Teams To Score — Yes
-Floor 57%, min edge 1.08×. Gates: both sides can score (each ≥ 70%, blanks ≤ 30%); no
-clean-sheet fortress; the 1-0 / 0-0 trap is not live (≤ 28%); no heavy favourite shutting the
-game down; no rotation or key attackers out. Checks: both attacks project, both defences
-concede, BTTS form, head-to-head BTTS rate, open total, league environment.
-
-### Both Teams To Score — No
-Floor 57%, min edge 1.08×. Gates: the weaker attack can realistically blank; the 1-1 trap
-is not live (P(1-1) ≤ 12%, P(BTTS) ≤ 40%); the weaker side is not on a scoring run; not both
-defences leaking; no defender or keeper loss on the favourite side. Checks: underdog attack
-verified weak, opposing defence holds, blank frequency, head-to-head, low total.
-
-### GG/NG 2+ — Both Teams 2+ Goals (paper only)
-Floor 22%, min edge 1.3×, sample ≥ 8 each, max 2 legs, 1 unit fixed. Gates: both sides can
-score 2+ (convolution, each ≥ 45%); real xG or full results plus team news; scoreline mass
-not parked on 1-1 / 2-0 / 2-1 / 1-2 (≤ 45%); no favourite under 1.60; no rotation; each side
-scores 2+ in half its games and 3+ in a quarter. Always PAPER: v3.1 requires a 40-leg tracked record at ≥ 55% before real money.
-
-### Team Total Goals
-Selections per side: **Over 1.5**, **Under 1.5**, **Under 0.5 (fails to score)**. Each selection has its
-own floor, shown on the Methodology tab and in each verdict. Over 1.5 needs a side that scores 2+
-regularly against a defence that concedes, with no low block, no rotation and no heavy underdog.
-Under 1.5 needs a side that rarely scores 2+ and an opponent that defends. Under 0.5 needs a
-genuine blank profile and no big-score habit.
-
-### Home Win
-Floor 55%, min edge 1.1×. Gates: not fighting the bookmaker's favourite; Elo agrees (waived if
-absent); no rotation or mass absences; any win streak is backed by the numbers; the opponent
-cannot keep scoring through the game; not poor at home (wins ≥ 40%); win probability at least
-1.9× the draw. Checks: points per game, venue record, goal-difference gap, xG advantage, Elo,
-head-to-head, clean sheets, rest, opponent absences.
-
-### Draw (paper only)
-Floor 29%, min edge 1.15×. Gates: both sides draw often; genuinely balanced; low expected total
-(≤ 2.60); draws hold at the relevant venues; neither side a scoring machine; table positions close.
-**Always PAPER.** In the backtest this market had no predictive value, so it is shown for tracking only.
-
-### Away Win
-Floor 50%, min edge 1.1×. Same structure as Home Win, with the venue test applied to away form
-(wins ≥ 30%).
-
-### Underdog Handicap (+)
-Lines +0.5, +1, +1.5. Calibrated floors are high (74% for the covering side). Gates: the underdog
-avoids heavy defeats (≤ 12%); the favourite is not a big-margin side; the model puts a heavy
-defeat at ≤ 18%; the underdog can score; defence intact; not in freefall. Checks: the handicap
-covers the typical margin, underdog defence holds, narrow-defeat profile, favourite attack not elite,
-low total, modest Elo gap.
-
-### Favourite Handicap (−)
-Lines −1, −1.5. Floor 50%. Gates: wins by 2+ regularly (≥ 30%); scores 2+ regularly (≥ 55%); the
-opponent concedes and is not a low block; the model makes a 2+ goal win realistic (≥ 30%); Elo
-agrees (waived if absent); no rotation; attack intact; any streak is backed by the numbers.
-
-## Evidence the methodologies run on
-
-- **Per-game results (free):** openfootball on GitHub. Covers England 1–2, Germany 1–2,
-  Spain 1–2, Italy 1–2 and Austria 1. Used for 0/1/2+ goal distributions, streaks, clean
-  sheets, venue splits and head-to-head. Other leagues fall back to ESPN's last five games.
-- **Elo (free):** ClubElo CSV API, used only as an independent corroborating witness.
-- **Model:** Dixon-Coles bivariate Poisson on xG, then calibrated.
-- **Prices:** ESPN (DraftKings) and InferSports (Asian books) where quoted.
-- **News:** ESPN headlines, scanned for rotation, absences and departures.
-
-## What the tests show
-
-- Calibration is honest overall: 66.8% stated vs 66.5% observed on held-out 2025 matches.
-- The gates add real value for BTTS, and little for Over/Under 2.5.
-- Draw has no predictive value, so it is paper-only.
-- **Price edge and profit are untested.** There is no free historical odds feed, so nothing
-  here proves the strategy makes money. LOCK means "the numbers show an edge against a
-  quoted price", not "this will win".
-- The live ESPN, ClubElo and InferSports paths could not be exercised in the build sandbox
-  (only GitHub was reachable). They are covered by offline parsers and stubbed tests; the first
-  real run should be watched.
-
-Run `npm run backtest` to reproduce the backtest and `npm run test:methodology` for the checks.
+Reproduce everything: [`research/README.md`](research/README.md). Full tables: [`research/RESULTS.md`](research/RESULTS.md).

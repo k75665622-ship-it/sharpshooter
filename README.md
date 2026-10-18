@@ -1,13 +1,43 @@
-# SHARPSHOOTER
+# SHARPSHOOTER v5
 
-A football prediction engine that runs on **live data from free, key-less APIs**.
+A football prediction engine that runs on **live data from free, key-less sources**.
 
-It builds a Dixon-Coles bivariate Poisson model from real expected-goals data,  
-detects visible *and* hidden patterns, screens every market against a set of  
-bookmaker-trap gates, and then runs the match through **eleven market  
-methodologies** (Over/Under 2.5, BTTS Yes/No, GG/NG 2+, Team Total Goals, Home Win,  
-Draw, Away Win, Underdog Handicap +, Favourite Handicap −). A match is only  
-predicted in a market it genuinely falls under. See [METHODOLOGY.md](METHODOLOGY.md).
+Every fixture gets one calibrated forecast — the multi-book bookmaker consensus blended with an independent
+model (time-decayed Dixon-Coles ratings on cross-verified results, ESPN xG, ClubElo) — and is then run through
+**thirteen market methodologies**: Over 2.5, Under 2.5, BTTS Yes, BTTS No, GG/NG 2+, Team Total Goals, Home Win,
+Draw, Away Win, Double Chance, Underdog Handicap +, Favourite Handicap − and **Final Score**. A match is only
+predicted in a market it genuinely survives. Fixtures that fit no methodology still get a **general prediction**
+(result, goals, BTTS, predicted final score, best bet, confidence). Every pre-match prediction is recorded and
+settled into a public **track record**.
+
+See [METHODOLOGY.md](METHODOLOGY.md) for the summary and [`methodology/`](methodology/) for the full playbooks.
+
+---
+
+## What's new in v5
+
+| | v4 | v5 |
+|---|---|---|
+| Forecast | xG-only model, single book | **Market-anchored ensemble** (multi-book consensus 90% + independent model 10%) |
+| Probabilities | raw model | **Calibrated** per market on real results; checked on held-out seasons |
+| LOCK means | model beats the price | **a real price beats the multi-book fair price by ≥ 3%** (the only edge that tested positive) |
+| Methodologies | 11 | **13** (+ Double Chance, + Final Score) |
+| Fixtures with a prediction | methodology picks only | **every analysable fixture** (general prediction) |
+| Results data | openfootball only | **cross-verified** across openfootball, football-data.co.uk and ESPN |
+| Team news | ESPN headlines | + **Fantasy Premier League** chance-of-playing (Premier League) |
+| Odds | DraftKings + Asian books | + Bet365 via ESPN, + football-data fixtures (Bet365, Pinnacle, William Hill, Bwin, average) |
+| Track record | none | **ledger** of every pre-match pick, settled automatically, CSV export |
+
+Held-out 2023-26 backtest (same matches, v5 code vs v4 code): strongest pick per fixture **71.6% hit (said
+70.9%) on 9,114 picks** vs v4 66.7% (said 67.7%) on 6,577. Full table in [METHODOLOGY.md](METHODOLOGY.md);
+reproduction in [`research/`](research/README.md). **Accuracy is not profit** — see Honest limitations.
+
+### How to use a prediction
+- **LOCK** — a bookmaker is paying more than the consensus fair price. Take it at the quoted price.
+- **PREDICT** — qualifies. Bet only if your bookmaker pays at least the **"take at ≥"** price shown.
+- **PAPER** — tracked, not staked (GG/NG 2+ until its record proves itself).
+- **Every Match** tab — the general prediction for every fixture, including the predicted final score.
+- **Track Record** tab — every settled pre-match prediction, per methodology, downloadable as CSV.
 
 ---
 
@@ -30,7 +60,9 @@ built-in `http` server and global `fetch`. Requires Node 18+ (for global `fetch`
 To run the checks:
 
 ```bash
-npm run verify            # all offline checks, including the methodology suite
+npm run verify            # all offline checks, including the methodology and v5 suites
+npm run test:e2e          # whole server against stubbed live sources (offline)
+npm run demo:offline      # run the site on stubbed data, no internet needed
 npm run backtest          # walk-forward backtest on openfootball results (needs network)
 ```
 
@@ -49,6 +81,14 @@ npm run backtest          # walk-forward backtest on openfootball results (needs
 
 | 7 | `raw.githubusercontent.com/openfootball/{country}/...`               | **Per-game results** (free, no key) for England 1–2, Germany 1–2, Spain 1–2, Italy 1–2, Austria 1 |
 | 8 | `api.clubelo.com/{date}`                                             | **Club Elo ratings**, used only as an independent second opinion                              |
+| 9 | `football-data.co.uk/mmz4281/{season}/{div}.csv`, `/new/{CC}.csv`    | **Per-game results + closing odds** from ~6 books, 22 leagues — the second results witness      |
+| 10 | `football-data.co.uk/fixtures.csv`                                  | **Upcoming-fixture odds** (Bet365, Pinnacle, William Hill, Bwin, market average)               |
+| 11 | `site.api.espn.com/.../scoreboard?dates=YYYYMMDD-YYYYMMDD`          | Season results by month — the third results witness, and the ledger's settlement source        |
+| 12 | `fantasy.premierleague.com/api/bootstrap-static/`                   | **Premier League availability**: chance of playing, each player's share of team xG involvement |
+
+**Rule 41 — verified data.** A result is used only when the sources agree: `verified` (2+ sources match),
+`verified-majority`, or `corrected` (one source outvoted). Disputed results are dropped. Team names are mapped
+between sources automatically from identical same-day scores, and ambiguous names are refused rather than guessed.
 
 **54 competitions** are registered. The daily board polls **31 core competitions**;
 the full registry is used to resolve cup teams back to their domestic leagues.
@@ -192,6 +232,24 @@ The board still works — it is priced from ESPN alone, and says so.
 ---
 
 ## The pipeline
+
+v5 pipeline (per fixture):
+
+```
+  verified results (3 sources) ──► Dixon-Coles ratings ─┐
+  ESPN xG / xGA ────────────────► xG goal rates ───────┤
+  ClubElo ──────────────────────► Elo difference ──────┼─► model (10%)
+  multi-book odds (ESPN, football-data, InferSports) ──► de-vigged consensus ─► market goal rates (90%)
+        │
+        ▼
+  ensemble goal rates ─► ONE score matrix ─► calibrated markets ─► take-at prices
+        │
+        ├─► 13 methodologies (gates → checklist + independent witness → LOCK / PREDICT / PAPER / WATCH / REMOVE)
+        ├─► general prediction + predicted final score (every fixture)
+        └─► ledger (recorded pre-match, settled after full time)
+```
+
+The v4 pipeline below is still used for patterns, trap screening, the legacy banker and the xG component:
 
 ```
   fixtures + odds
@@ -450,8 +508,9 @@ the distortion but does not eliminate the extra uncertainty.
 | `GET /api/leagues`                       | Full league registry                          |
 | `GET /api/matches?date=YYYY-MM-DD`       | Fixture board (fast, no deep analysis)        |
 | `GET /api/analysis?league=&event=&year=` | Full deep report for one match                |
-| `GET /api/predictions?date=&limit=`      | Methodology predictions for the day, grouped by market |
-| `GET /api/methodology`                   | The eleven methodologies and their thresholds |
+| `GET /api/predictions?date=&limit=`      | Methodology predictions grouped by market, plus a `general` prediction for every fixture |
+| `GET /api/methodology`                   | The thirteen methodologies, thresholds, and the v4-vs-v5 backtest record |
+| `GET /api/ledger`                        | Track record of recorded pre-match predictions (settles finished games; `?format=csv` to download) |
 | `GET /api/bankers?date=&limit=`          | Legacy banker election (superseded)           |
 
 ---
@@ -469,9 +528,22 @@ sharpshooter/
 │   ├── signals.js      patterns, trap gates, sharpshooter scoring
 │   ├── history.js      free per-game results (openfootball)
 │   ├── elo.js          ClubElo ratings
-│   ├── methodology/    core framework + the eleven market methodologies
+│   ├── ratings.js      time-decayed Dixon-Coles ratings (MLE)
+│   ├── market.js       de-vig, multi-book pooling, market-implied goal rates
+│   ├── ensemble.js     market + model blend, calibration, derived markets
+│   ├── calibration.json  per-market calibration (generated by research/)
+│   ├── sources/        verified results (3 sources), odds consensus, FPL, name mapping
+│   ├── evidence.js     per-fixture verified history + ratings
+│   ├── pricing.js      take-at price and price-beats-consensus test
+│   ├── scoreline.js    predicted / most likely / half-time score
+│   ├── general.js      general prediction for every fixture
+│   ├── ledger.js       pre-match record + settlement
+│   ├── methodology/    core framework + the thirteen market methodologies
 │   └── engine.js       orchestration + methodology layer + legacy banker
-├── METHODOLOGY.md      reference for all eleven methodologies
+├── METHODOLOGY.md      summary of all thirteen methodologies
+├── methodology/        full v5 playbooks (one per market)
+├── research/           backtests and studies behind every v5 number
+├── test/               v5 unit tests, offline end-to-end test, fixtures
 ├── backtest_methodology.js  walk-forward backtest
 ├── test_methodology.js      methodology checks
 ├── public/             front-end (vanilla JS, no build step)
@@ -540,27 +612,18 @@ behaviour. If you want more picks, the `lean` tier is where they live.
 
 ## Honest limitations
 
-- **No injury/suspension feed.** ESPN's soccer API does not expose a per-match  
-  injury list. The engine reads cards and suspensions from season statistics and  
-  surfaces recent team news in the UI — but you must check the lineup yourself  
-  before acting. The app says so explicitly.
-- **Cross-league ties are the model's weak point.** The strength table corrects  
-  the gross distortion but is not a substitute for proper cross-league  
-  calibration. Such fixtures carry a flag and rarely produce a banker.
-- **Odds come from one book.** ESPN quotes DraftKings. Line movement is that  
-  book's open→close, not a market-wide consensus. It is a real signal, but a  
-  single-venue one.
-- **ESPN quotes only three markets.** 1X2, one total line, one spread line.  
-  Everything else is derived from our own model and cannot be value-verified —  
-  which is why unquoted markets are barred from banker election.
-- **Early season is noisy.** With four games played, ratings are shrunk hard  
-  toward the mean. The model reports its own sample size and flags it.
-- **Price edge is untested.** No free historical odds feed exists, so the backtest  
-  proves calibration and the value of the gates, not profit.
-- **Draw and GG/NG 2+ are paper-only** because the evidence does not support real stakes.
-- **Live free-source paths** (ESPN, ClubElo, InferSports) were not reachable in the build  
-  sandbox. They are covered by offline parsers and stubs; watch the first real run.
-- **Per-game history covers nine leagues.** Elsewhere the methodologies use ESPN's last five  
-  games, and the sample gates make them stricter.
-- **Nothing is guaranteed.** This is an analytical tool. It quantifies  
-  probability; it does not predict the future.
+- **Accuracy is not profit.** The bookmaker consensus is the best single forecast available, and betting where
+  a model disagrees with it *lost* 13–29% in testing. At Bet365 prices no methodology made a reliable profit;
+  at the best of ~17 books, Home Win (+2.5%) and Away Win (+4.7%) were positive but their intervals include
+  zero. LOCK only says a price beats the consensus. Use the take-at price.
+- **Team news.** Fantasy Premier League gives real availability for the Premier League only. Elsewhere the
+  engine reads ESPN headlines — check lineups yourself.
+- **Live free-source paths** (ESPN, football-data, FPL, ClubElo, InferSports) were not reachable from the build
+  sandbox. Their parsers are tested on their exact live shapes, offline (`test/e2e_offline.js`); watch the first
+  real run and `/api/health`.
+- **The ledger lives on disk.** On a host with an ephemeral disk (Render's free tier) it resets on redeploy —
+  download the CSV from the Track Record tab to keep it.
+- **Draw is half-stake and Final Score quarter-stake**, because they lose most of the time even when right to
+  pick. **GG/NG 2+ stays paper** until its own record passes Rule 34.
+- **Cross-league ties and early season** are the weakest spots; the engine flags them and the gates get stricter.
+- **Nothing is guaranteed.** This is an analytical tool. It quantifies probability; it does not predict the future.
