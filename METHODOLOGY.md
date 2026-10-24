@@ -1,4 +1,17 @@
-# Sharpshooter methodologies (v5.0)
+# Sharpshooter methodologies (v5.0) and the v6 normal prediction
+
+**v6 — the normal prediction for every match** ([full playbook](methodology/GENERAL-PREDICTION-v6.md)): 170 measured
+factors on top of the bookmakers' price → a calibrated forecast for every market → main pick (most likely selection
+paying ≥ 1.30, never a flagged trap), safer pick, value pick (best price ≥ 5% above fair), avoid list, and every
+pattern that fires with its measured verdict. Held-out 2023-26: main pick 72.7% (stated 73.1%); value picks +6.6% at
+the best price; "avoid" selections won 50.3% vs 52.8% implied.
+
+**v6 — the double-confirmed accumulator:** a leg must qualify under a methodology (LOCK or PREDICT) **and** the normal
+prediction must agree (its main pick, a safer form of it, or its result / goals / BTTS call at 60%+), never a flagged
+trap. Held-out doubles won 67.3% (stated 63.7%); combined probabilities are reliable, profit is only consistent for
+doubles at good prices.
+
+---
 
 Thirteen market methodologies decide what the site predicts, and a general prediction covers every fixture.
 This is the plain-English reference. The full playbooks — written in the style of the original v3.0 / v3.1 /
@@ -14,7 +27,8 @@ v2.5 personal playbooks, one per market — are in [`methodology/`](methodology/
 | [`GG-NG-2PLUS-v5.md`](methodology/GG-NG-2PLUS-v5.md) | GG/NG 2+ (from v3.1) |
 | [`RESULTS-v5.md`](methodology/RESULTS-v5.md) | Home Win, Away Win, Draw, Double Chance (new) |
 | [`TEAM-TOTALS-AND-HANDICAPS-v5.md`](methodology/TEAM-TOTALS-AND-HANDICAPS-v5.md) | Team Totals, Underdog +, Favourite − |
-| [`FINAL-SCORE-AND-GENERAL-v5.md`](methodology/FINAL-SCORE-AND-GENERAL-v5.md) | Final Score (new) and the General Prediction (new) |
+| [`FINAL-SCORE-AND-GENERAL-v5.md`](methodology/FINAL-SCORE-AND-GENERAL-v5.md) | Final Score (new) and the v5 General Prediction |
+| [`GENERAL-PREDICTION-v6.md`](methodology/GENERAL-PREDICTION-v6.md) | **v6**: the normal prediction (170 factors, decision, traps) and the double-confirmed accumulator |
 
 ## How a prediction is made
 

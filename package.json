@@ -1,13 +1,13 @@
 {
   "name": "sharpshooter",
-  "version": "5.0.0",
+  "version": "6.0.0",
   "private": true,
-  "description": "Football prediction engine — market-anchored ensemble (bookmaker consensus + Dixon-Coles ratings on cross-verified results + xG + Elo), calibrated on 46,121 matches, screened by thirteen market methodologies.",
+  "description": "Football prediction engine \u2014 v6 match intelligence (170 measured factors on top of the bookmaker price, trained on 134,579 matches), polite free-data crawler, thirteen market methodologies and a double-confirmed accumulator.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "verify": "node test/v5_unit.js && node test/e2e_offline.js && node test_crosscheck.js && node test_consensus_price.js && node test_news.js && node test_quota.js && node test_methodology.js && node test_pricebacktest.js",
+    "verify": "node test/v6_unit.js && node test/v5_unit.js && node test/e2e_offline.js && node test_crosscheck.js && node test_consensus_price.js && node test_news.js && node test_quota.js && node test_methodology.js && node test_pricebacktest.js",
     "test:engine": "node test_engine.js",
     "test:board": "node test_board.js",
     "test:quota": "node test_quota.js",
@@ -18,7 +18,9 @@
     "test:v5": "node test/v5_unit.js",
     "test:e2e": "node test/e2e_offline.js",
     "demo:offline": "SERVE_PORT=4000 node test/e2e_offline.js",
-    "research:build": "node research/build_states.js"
+    "research:build": "node research/build_states.js",
+    "test:v6": "node test/v6_unit.js",
+    "research:v6:features": "node research/v6/build_features.js"
   },
   "engines": {
     "node": ">=18"
@@ -31,7 +33,10 @@
     "poisson",
     "dixon-coles",
     "xg",
-    "betting-model"
+    "betting-model",
+    "gradient-boosting",
+    "web-crawler",
+    "accumulator"
   ],
   "license": "MIT"
 }

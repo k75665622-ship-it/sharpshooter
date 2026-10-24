@@ -97,7 +97,7 @@ for (const div of Object.keys(byDiv)) {
       if (hit == null && !/^DNB|^AH/.test(r.pick.key)) continue;
       const [b365, max] = pricesFor(r.pick.key, o);
       rows.push({
-        div, season, id: r.id, key: r.pick.key, status: r.status, kept: out.predictions.includes(r), headline: out.headline === r,
+        div, season, date: fx.date, home: fx.home, away: fx.away, id: r.id, key: r.pick.key, status: r.status, kept: out.predictions.includes(r), headline: out.headline === r,
         prob: r.prob, model: r.modelProb, hit, b365, max, priceState: r.price && r.price.state,
         ...(process.env.DIAG && process.env.DIAG.split(',').includes(r.id) ? {
           gates: Object.fromEntries(r.gates.map((g) => [g.id, g.unknown ? null : g.pass ? 1 : 0])),
