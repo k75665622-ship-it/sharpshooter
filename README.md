@@ -20,6 +20,43 @@ See [`methodology/GENERAL-PREDICTION-v6.md`](methodology/GENERAL-PREDICTION-v6.m
 
 ---
 
+## Strongest Picks
+
+The **Strongest Picks** tab lists the picks every independent view agrees on, one per match, with **no fixed
+number**: a weak day gives none, a strong day can give twelve.
+
+Every fixture is priced across SportyBet's nine market groups — **Goals, Corners, Half, Players, Minutes, Team,
+Match, Bookings, Special** — and every selection is priced by several views that do not share their inputs:
+
+| Markets | Views |
+|---|---|
+| Goals, Half, Minutes, Team, Match, Special | **Market** (the site's ensemble: de-vigged multi-book price 90% + model 10%, calibrated) · **Stats** (verified-results ratings, ESPN xG and ClubElo, no price) · **v6 factors** (170 measured factors on top of the price) |
+| Corners, Bookings | **Season** (last 20 league games, home/away split, shrunk to the league average) · **Last 6** games — from the football-data.co.uk archive: corners won/conceded, cards, the league's dispersion, the referee's card rate (England/Scotland), head-to-head |
+| Players | team expected goals from the market and stats views × the player's share — Fantasy Premier League xG (Premier League) or ESPN's top scorers (every other league), with the line-up once ESPN publishes it |
+
+Half-time markets use each league's **measured** first-half goal share (football-data half-time scores). Minute
+markets split it the way goals fall in large samples (about 13% of goals in minutes 1-15, 28% in 1-30).
+
+**A pick qualifies when:** every view rates it at least **75%** (corners and bookings, which have no bookmaker price
+on free data: **80%** from both views); it still pays at least **1.14** at fair odds; goal picks are anchored by a real
+bookmaker price; the v6 layer does not flag it as a trap or as overrated by the price; and no serious team news hits
+the side it backs. Scorer picks are never on the list (they hang on the line-up). Strength is the **lowest** view:
+**Elite** 85%+, **Strong** 80%+, **Solid** 75%+. Every number lives in [`lib/strongest/config.js`](lib/strongest/config.js).
+
+Each pick comes with the facts behind it (prices, expected goals, last-10 form at its own line, head-to-head, table,
+referee, players, team news) and its caveats. The tab also shows every match's nine-market card, near misses, the
+chance of combining the top picks, and a **track record**: every pick is written down before kick-off (data/strongest)
+and settled from ESPN results and the football-data archive (half-time, corners, cards). Nothing is edited afterwards.
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/strongest?date=YYYY-MM-DD` | the day's Strongest Picks, near misses, combined chances and every match's nine-market card |
+| `GET /api/strongest/record[?format=csv]` | the Strongest Picks track record |
+
+`npm run test:strongest` runs its offline tests (maths, pick rules, reasons, settlement).
+
+---
+
 ## What's new in v6
 
 | | v5 | v6 |
@@ -553,6 +590,8 @@ the distortion but does not eliminate the extra uncertainty.
 | `GET /api/crawler`                       | v6 crawler status per source (requests, cache hits, 304s, stale serves, robots, pauses) |
 | `GET /api/intel-research`                | v6 research record: decision backtest, accumulator backtest, factor importance, pattern verdicts |
 | `GET /api/bankers?date=&limit=`          | Legacy banker election (superseded)           |
+| `GET /api/strongest?date=`               | Strongest Picks: nine SportyBet market groups per match, one pick per match when every view agrees |
+| `GET /api/strongest/record`              | Strongest Picks track record (`?format=csv` to download) |
 
 ---
 
@@ -584,6 +623,8 @@ sharpshooter/
 │   ├── factors/        v6 factor engine: records, history store, 170 factors, tree-model evaluator, models/
 │   ├── intel/          v6 normal prediction: predict, decision, rules (patterns), explain, accumulator
 │   ├── methodology/    core framework + the thirteen market methodologies
+│   ├── strongest/      Strongest Picks: config, inputs (archive, players, line-ups), markets (nine groups),
+│   │                   picks (rules), reasons, record (track record), index (the day)
 │   └── engine.js       orchestration + methodology layer + legacy banker
 ├── METHODOLOGY.md      summary of all thirteen methodologies
 ├── methodology/        full v5 playbooks (one per market)

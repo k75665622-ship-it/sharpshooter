@@ -330,6 +330,26 @@ global.fetch = async (input, init) => {
     const ir = (await get('/api/intel-research')).body;
     t('research record served (decision, accumulator, importance, patterns)', ir.record && ir.accumulator && ir.importance && ir.patterns && Object.keys(ir.patterns.rules).length >= 40);
 
+    // ---------------------------------------------------------------- Strongest Picks
+    const sp = (await get(`/api/strongest?date=${day}`)).body;
+    const GROUPS9 = 'Goals,Corners,Half,Players,Minutes,Team,Match,Bookings,Special';
+    t('strongest: both fixtures priced', sp.counts && sp.counts.priced === 2, JSON.stringify(sp.counts || sp.error));
+    t('strongest: every match card has the nine SportyBet groups in order', (sp.matches || []).length === 2 && sp.matches.every((m) => m.cards.map((c) => c.group).join(',') === GROUPS9));
+    t('strongest: three independent goal views (market, stats, v6 factors)', sp.matches.every((m) => m.data.views.join(',') === 'market,stats,factors'), JSON.stringify(sp.matches.map((m) => m.data.views)));
+    t('strongest: corners and bookings priced from the crawled archive', sp.matches.every((m) => m.data.corners && m.data.bookings));
+    t('strongest: first-half share measured from the archive half-times', sp.matches.every((m) => m.data.firstHalfShare > 0.38 && m.data.firstHalfShare < 0.5), JSON.stringify(sp.matches.map((m) => m.data.firstHalfShare)));
+    const spBar = (p) => (p.kind === 'corners' || p.kind === 'cards' ? sp.config.floorStatsOnly : sp.config.floor);
+    t('strongest: every pick clears the bar in every view and still pays', (sp.picks || []).every((p) => Object.values(p.pick.views).every((v) => v >= spBar(p.pick) - 1e-9) && p.pick.prob <= sp.config.maxProb), JSON.stringify((sp.picks || []).map((p) => p.pick.views)));
+    t('strongest: at most one pick per match, no fixed count', new Set(sp.picks.map((p) => p.match.id)).size === sp.picks.length && sp.picks.length <= 2);
+    t('strongest: picks carry reasons, checks and a take-at price', sp.picks.every((p) => p.pick.reasons.length >= 2 && /%/.test(p.pick.checks) && p.pick.takeAt >= 1.05));
+    t('strongest: reasons quote real numbers, never undefined / NaN', sp.matches.every((m) => m.cards.every((c) => c.none || (c.reasons || []).every((r) => !/undefined|NaN/.test(r)))));
+    t('strongest: picks recorded before kick-off', sp.record && sp.record.picks.pending >= sp.picks.length, JSON.stringify(sp.record && sp.record.picks));
+    t('strongest: rules and thresholds published', Array.isArray(sp.rules) && sp.rules.length >= 4 && sp.config.floor === 0.75);
+    const spRec = (await get('/api/strongest/record')).body;
+    t('strongest: track record endpoint', spRec.picks && spRec.byTier && Array.isArray(spRec.recent));
+    const spCsv = await get('/api/strongest/record?format=csv');
+    t('strongest: track record CSV', typeof spCsv.body === 'string' && spCsv.body.startsWith('date,kind,league'));
+
     const meth = (await get('/api/methodology')).body;
     t('methodology endpoint is v5 with backtest numbers', meth.version === '5.0' && meth.backtest && meth.backtest.headline && meth.backtest.headline.v5.n > 1000);
 
@@ -348,7 +368,7 @@ global.fetch = async (input, init) => {
       console.log('  SKIP  jsdom not installed (set JSDOM_PATH to run the UI pass)');
     }
     if (JSDOM) {
-      const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8').replace('<script src="/app.js"></script>', '');
+      const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8').replace('<script src="/app.js"></script>', '').replace('<script src="/strongest.js"></script>', '');
       const errors = [];
       const dom = new JSDOM(html, { url: base + '/', runScripts: 'dangerously', pretendToBeVisual: true });
       const w = dom.window;
@@ -358,6 +378,9 @@ global.fetch = async (input, init) => {
       const sc = w.document.createElement('script');
       sc.textContent = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8');
       w.document.body.appendChild(sc);
+      const sc2 = w.document.createElement('script');
+      sc2.textContent = fs.readFileSync(path.join(__dirname, '..', 'public', 'strongest.js'), 'utf8');
+      w.document.body.appendChild(sc2);
       w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
       const settle = (ms) => new Promise((r) => setTimeout(r, ms));
       w.eval(`setDate(${JSON.stringify(day)})`);
@@ -365,11 +388,17 @@ global.fetch = async (input, init) => {
       const board = w.document.querySelector('#board').textContent;
       t('Matches tab lists the fixtures', /Arsenal/.test(board) && /Sunderland/.test(board), board.slice(0, 200));
       t('Matches tab shows predicted score chips', w.document.querySelectorAll('.sc-chip').length === 2);
-      for (const view of ['predictions', 'top', 'general', 'acca', 'record', 'method']) {
+      for (const view of ['strongest', 'predictions', 'top', 'general', 'acca', 'record', 'method']) {
         w.eval(`setView(${JSON.stringify(view)})`);
         await settle(1200);
         const txt = w.document.querySelector('#board').textContent;
         t(`${view} tab renders`, txt.length > 40 && !/Analysis failed|Could not load/.test(txt), txt.slice(0, 160));
+        if (view === 'strongest') {
+          t('Strongest Picks tab shows the picks and the nine-market cards', /The picks every view agrees on/.test(txt) && w.document.querySelectorAll('.sp-mc').length === 2 && w.document.querySelectorAll('.sp-row').length === 18, txt.slice(0, 200));
+          w.document.querySelector('[data-group="Corners"]').click();
+          await settle(50);
+          t('Strongest Picks market filter shows one row per match', w.document.querySelectorAll('.sp-row').length === 2);
+        }
       }
       w.eval("openMatch('9001','eng.1','2026')");
       await settle(1500);
