@@ -1,20 +1,49 @@
-# SHARPSHOOTER v5
+# SHARPSHOOTER v6
 
 A football prediction engine that runs on **live data from free, key-less sources**.
 
-Every fixture gets one calibrated forecast — the multi-book bookmaker consensus blended with an independent
-model (time-decayed Dixon-Coles ratings on cross-verified results, ESPN xG, ClubElo) — and is then run through
-**thirteen market methodologies**: Over 2.5, Under 2.5, BTTS Yes, BTTS No, GG/NG 2+, Team Total Goals, Home Win,
-Draw, Away Win, Double Chance, Underdog Handicap +, Favourite Handicap − and **Final Score**. A match is only
-predicted in a market it genuinely survives. Fixtures that fit no methodology still get a **general prediction**
-(result, goals, BTTS, predicted final score, best bet, confidence). Every pre-match prediction is recorded and
-settled into a public **track record**.
+Every fixture gets the **v6 normal prediction**: a polite crawler collects the match data (football-data.co.uk match
+statistics and odds, ClubElo history, ESPN, Open-Meteo), **170 measured factors** are computed — form and trend, goal
+trends, shots and luck, results against the bookmakers' expectation, Elo momentum, head-to-head, table and motivation,
+schedule, discipline, league — and a factor model trained on **134,579 matches** turns them, together with the
+bookmakers' price, into one calibrated forecast for every market. Each match then gets a **main pick**, a **safer
+pick**, a **value pick** when a price beats fair, an **avoid list** of bookmaker traps, and every pattern that fires
+with its **measured verdict**.
 
-See [METHODOLOGY.md](METHODOLOGY.md) for the summary and [`methodology/`](methodology/) for the full playbooks.
+On top of that, **thirteen market methodologies** (Over/Under 2.5, BTTS, GG/NG 2+, team totals, home / draw / away,
+double chance, Asian handicaps, final score) decide which markets a match genuinely survives, and the
+**double-confirmed accumulator** takes only selections that pass a methodology **and** the normal prediction.
+Every pre-match prediction is recorded and settled into a public **track record**.
+
+See [`methodology/GENERAL-PREDICTION-v6.md`](methodology/GENERAL-PREDICTION-v6.md) (normal prediction and accumulator),
+[METHODOLOGY.md](METHODOLOGY.md) and the playbooks in [`methodology/`](methodology/).
 
 ---
 
-## What's new in v5
+## What's new in v6
+
+| | v5 | v6 |
+|---|---|---|
+| Normal prediction | price + model ensemble, most likely selection ≥ 1.30 | **170 measured factors** on top of the price; main / safer / value pick; avoid list; confidence with its measured hit rate |
+| Data | results, odds, xG | + **crawler**: shots, shots on target, corners, cards, half-times, opening & closing odds (6 seasons), Elo momentum, weather |
+| Factor weights | — | **measured** per family (what moves the forecast with a price, and without one) |
+| Bookmaker traps | heuristic gates | **46 popular patterns tested**: 2 confirmed edges, 1 confirmed trap, 35 already priced in — shown with their evidence |
+| Fixtures with no price | ratings + xG + Elo | factor-only model: recovers 84% of what the price knows |
+| Accumulator | — | **double-confirmed**: methodology AND normal prediction agree; best 2-5 folds, take-at price, measured record |
+| Explanations | — | every family in plain English, with how far it moved the pick; last-10 trends; head-to-head; table |
+
+Held-out 2023-26 (29,206 matches, never used for any choice): main pick **72.7%** (stated 73.1%); value picks
+**+6.6% at the best price** (2,631 bets; +6.3% on the tuning seasons); selections on the avoid list won **50.3%**
+against the 52.8% the price implied; double-confirmed doubles **67.3%** (stated 63.7%). Full results:
+[`research/v6/RESULTS.md`](research/v6/RESULTS.md).
+
+**What the data says plainly:** the bookmakers' price already contains almost everything form, head-to-head and
+the table can tell you. With a price, the factors improve the forecast by a small, measurable amount; the real gains
+are the traps the site keeps you out of, the value it finds when a price beats fair, and fixtures with no price.
+
+---
+
+## What was new in v5
 
 | | v4 | v5 |
 |---|---|---|
@@ -60,7 +89,7 @@ built-in `http` server and global `fetch`. Requires Node 18+ (for global `fetch`
 To run the checks:
 
 ```bash
-npm run verify            # all offline checks, including the methodology and v5 suites
+npm run verify            # all offline checks, including the methodology, v5 and v6 suites
 npm run test:e2e          # whole server against stubbed live sources (offline)
 npm run demo:offline      # run the site on stubbed data, no internet needed
 npm run backtest          # walk-forward backtest on openfootball results (needs network)
@@ -85,6 +114,15 @@ npm run backtest          # walk-forward backtest on openfootball results (needs
 | 10 | `football-data.co.uk/fixtures.csv`                                  | **Upcoming-fixture odds** (Bet365, Pinnacle, William Hill, Bwin, market average)               |
 | 11 | `site.api.espn.com/.../scoreboard?dates=YYYYMMDD-YYYYMMDD`          | Season results by month — the third results witness, and the ledger's settlement source        |
 | 12 | `fantasy.premierleague.com/api/bootstrap-static/`                   | **Premier League availability**: chance of playing, each player's share of team xG involvement |
+
+| 13 | `api.open-meteo.com` + `geocoding-api.open-meteo.com`             | **Kick-off weather** (temperature, rain, wind) — context only, never a model input               |
+
+**The v6 crawler** (`lib/crawler/`) fetches the football-data archive (6 seasons per league: shots, corners, cards,
+half-times, Bet365 + best-of-market odds), football-data's upcoming-fixture prices, three ClubElo snapshots a day
+(now / 30 / 90 days) and Open-Meteo. It obeys robots.txt, rate-limits every host (football-data: one file a second),
+revalidates unchanged files with ETag / Last-Modified, serves the last good copy when a source is down (never caching
+a failure), and pauses a failing host for 10 minutes. `GET /api/crawler` shows every host's requests, cache hits,
+304s, stale serves and robots blocks. Sites whose terms forbid scraping (Transfermarkt, FBref, Sofascore) are not used.
 
 **Rule 41 — verified data.** A result is used only when the sources agree: `verified` (2+ sources match),
 `verified-majority`, or `corrected` (one source outvoted). Disputed results are dropped. Team names are mapped
@@ -511,6 +549,9 @@ the distortion but does not eliminate the extra uncertainty.
 | `GET /api/predictions?date=&limit=`      | Methodology predictions grouped by market, plus a `general` prediction for every fixture |
 | `GET /api/methodology`                   | The thirteen methodologies, thresholds, and the v4-vs-v5 backtest record |
 | `GET /api/ledger`                        | Track record of recorded pre-match predictions (settles finished games; `?format=csv` to download) |
+| `GET /api/accumulator?date=`             | v6 double-confirmed accumulator: legs, best 2-5 folds, take-at prices, measured record |
+| `GET /api/crawler`                       | v6 crawler status per source (requests, cache hits, 304s, stale serves, robots, pauses) |
+| `GET /api/intel-research`                | v6 research record: decision backtest, accumulator backtest, factor importance, pattern verdicts |
 | `GET /api/bankers?date=&limit=`          | Legacy banker election (superseded)           |
 
 ---
@@ -537,12 +578,16 @@ sharpshooter/
 │   ├── pricing.js      take-at price and price-beats-consensus test
 │   ├── scoreline.js    predicted / most likely / half-time score
 │   ├── general.js      general prediction for every fixture
-│   ├── ledger.js       pre-match record + settlement
+│   ├── ledger.js       pre-match record + settlement (picks, value picks, accumulators)
+│   ├── crawler/        v6 polite crawler: http.js (robots, rate limits, conditional GET, cache),
+│   │                   sources/ (football-data, ClubElo momentum, Open-Meteo), warehouse.js
+│   ├── factors/        v6 factor engine: records, history store, 170 factors, tree-model evaluator, models/
+│   ├── intel/          v6 normal prediction: predict, decision, rules (patterns), explain, accumulator
 │   ├── methodology/    core framework + the thirteen market methodologies
 │   └── engine.js       orchestration + methodology layer + legacy banker
 ├── METHODOLOGY.md      summary of all thirteen methodologies
 ├── methodology/        full v5 playbooks (one per market)
-├── research/           backtests and studies behind every v5 number
+├── research/           backtests and studies behind every v5 number; research/v6/ for v6
 ├── test/               v5 unit tests, offline end-to-end test, fixtures
 ├── backtest_methodology.js  walk-forward backtest
 ├── test_methodology.js      methodology checks
@@ -612,6 +657,12 @@ behaviour. If you want more picks, the `lean` tier is where they live.
 
 ## Honest limitations
 
+- **More factors are not a crystal ball.** 170 factors improve on the bookmakers' price by a small amount (result and
+  goals log-loss about 0.03%, BTTS 0.32%). Most betting folklore (streaks, revenge, dead rubbers, hyped overs) is
+  already priced in — the site says so whenever such a pattern fires.
+- **The live crawler** could not reach its sources from the build environment; it is tested offline against the
+  sources' exact formats (`test/v6_unit.js`, `test/e2e_offline.js`). Watch `/api/crawler` on the first live run.
+  The first deep analysis of a league waits for its archive download (one file a second); after that it is cached.
 - **Accuracy is not profit.** The bookmaker consensus is the best single forecast available, and betting where
   a model disagrees with it *lost* 13–29% in testing. At Bet365 prices no methodology made a reliable profit;
   at the best of ~17 books, Home Win (+2.5%) and Away Win (+4.7%) were positive but their intervals include

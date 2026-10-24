@@ -1,0 +1,413 @@
+{
+ "generated": "2026-10-24",
+ "splits": {
+  "train": [
+   "2005-07-01",
+   "2019-06-30"
+  ],
+  "tune": [
+   "2019-07-01",
+   "2023-06-30"
+  ],
+  "heldOut": [
+   "2023-07-01",
+   "end"
+  ]
+ },
+ "models": {
+  "result": {
+   "trainRows": 134579,
+   "tuneRows": 47337,
+   "testRows": 29191,
+   "trees": 104,
+   "testLogloss": 1.0022,
+   "testPriceLogloss": 1.0025,
+   "gainPct": 0.03,
+   "gainCI95": [
+    -0.000154,
+    0.000767
+   ]
+  },
+  "over25": {
+   "trainRows": 103670,
+   "tuneRows": 29916,
+   "testRows": 22963,
+   "trees": 102,
+   "testLogloss": 0.6761,
+   "testPriceLogloss": 0.6764,
+   "gainPct": 0.032,
+   "gainCI95": [
+    -0.000119,
+    0.00055
+   ]
+  },
+  "btts": {
+   "trainRows": 134579,
+   "tuneRows": 47337,
+   "testRows": 29191,
+   "trees": 362,
+   "testLogloss": 0.6843,
+   "testPriceLogloss": 0.6865,
+   "gainPct": 0.319,
+   "gainCI95": [
+    0.00145,
+    0.002905
+   ]
+  },
+  "goals_h": {
+   "trainRows": 134806,
+   "tuneRows": 47392,
+   "testRows": 29206,
+   "trees": 1138,
+   "testLogloss": 1.5084,
+   "testPriceLogloss": null,
+   "gainPct": null,
+   "gainCI95": null
+  },
+  "goals_a": {
+   "trainRows": 134806,
+   "tuneRows": 47392,
+   "testRows": 29206,
+   "trees": 1159,
+   "testLogloss": 1.3918,
+   "testPriceLogloss": null,
+   "gainPct": null,
+   "gainCI95": null
+  },
+  "result_nomkt": {
+   "trainRows": 134806,
+   "tuneRows": 47392,
+   "testRows": 29206,
+   "trees": 307,
+   "testLogloss": 1.0145,
+   "testPriceLogloss": null,
+   "gainPct": null,
+   "gainCI95": null,
+   "pricedSubset": {
+    "n": 29191,
+    "nomkt_logloss": 1.0146019804514461,
+    "market_logloss": 1.0024650901541403
+   },
+   "baseRateLogloss": 1.0767,
+   "accuracy": 0.4922
+  }
+ },
+ "heldOut": {
+  "window": [
+   "2023-07-01",
+   "2099-01-01"
+  ],
+  "fixtures": 29206,
+  "main": {
+   "n": 28455,
+   "hit": 0.7274,
+   "stated": 0.7309,
+   "roiBet365": -0.0367,
+   "nBet365": 7789,
+   "roiBest": 0.0014,
+   "nBest": 7789
+  },
+  "mainPricedOnly": {
+   "n": 7789,
+   "hit": 0.7328,
+   "stated": 0.7273,
+   "roiBet365": -0.0367,
+   "nBet365": 7789,
+   "roiBest": 0.0014,
+   "nBest": 7789
+  },
+  "safer": {
+   "n": 9011,
+   "hit": 0.8214,
+   "stated": 0.8152,
+   "roiBet365": -0.0341,
+   "nBet365": 3791,
+   "roiBest": 0.0059,
+   "nBest": 3791
+  },
+  "value": {
+   "n": 2631,
+   "hit": 0.4443,
+   "stated": 0.4457,
+   "roiBet365": -0.0119,
+   "nBet365": 2631,
+   "roiBest": 0.0661,
+   "nBest": 2631
+  },
+  "v5rule": {
+   "n": 28547,
+   "hit": 0.7447,
+   "stated": 0.7402,
+   "roiBet365": -0.0401,
+   "nBet365": 7266,
+   "roiBest": -0.0015,
+   "nBest": 7266
+  },
+  "avoid": {
+   "n": 27448,
+   "won": 0.503,
+   "marketSaid": 0.5283,
+   "v6Said": 0.4939
+  },
+  "grades": {
+   "High": {
+    "n": 23935,
+    "hit": 0.7393,
+    "stated": 0.744,
+    "roiBet365": -0.0435,
+    "nBet365": 6325,
+    "roiBest": -0.0038,
+    "nBest": 6325
+   },
+   "Medium": {
+    "n": 4147,
+    "hit": 0.6757,
+    "stated": 0.6703,
+    "roiBet365": -0.0065,
+    "nBet365": 1447,
+    "roiBest": 0.0251,
+    "nBest": 1447
+   },
+   "Low": {
+    "n": 373,
+    "hit": 0.5389,
+    "stated": 0.5604,
+    "roiBet365": -0.1024,
+    "nBet365": 17,
+    "roiBest": -0.0853,
+    "nBest": 17
+   }
+  },
+  "logloss": {
+   "1": {
+    "n": 29191,
+    "v6": 0.6259,
+    "priceOnly": 0.6261
+   },
+   "2": {
+    "n": 29191,
+    "v6": 0.5592,
+    "priceOnly": 0.5597
+   },
+   "X": {
+    "n": 29191,
+    "v6": 0.5713,
+    "priceOnly": 0.5712
+   },
+   "O1.5": {
+    "n": 29191,
+    "v6": 0.5459,
+    "priceOnly": 0.5457
+   },
+   "O2.5": {
+    "n": 29191,
+    "v6": 0.6765,
+    "priceOnly": 0.6766
+   },
+   "O3.5": {
+    "n": 29191,
+    "v6": 0.59,
+    "priceOnly": 0.59
+   },
+   "BTTS_Y": {
+    "n": 29191,
+    "v6": 0.6843,
+    "priceOnly": 0.6853
+   },
+   "TTH_O0.5": {
+    "n": 29191,
+    "v6": 0.5134,
+    "priceOnly": 0.5136
+   },
+   "TTA_O0.5": {
+    "n": 29191,
+    "v6": 0.5914,
+    "priceOnly": 0.5911
+   },
+   "TTH_O1.5": {
+    "n": 29191,
+    "v6": 0.645,
+    "priceOnly": 0.6452
+   },
+   "TTA_O1.5": {
+    "n": 29191,
+    "v6": 0.6123,
+    "priceOnly": 0.612
+   }
+  }
+ },
+ "tuning": {
+  "window": [
+   "2019-07-01",
+   "2023-06-30"
+  ],
+  "fixtures": 47392,
+  "main": {
+   "n": 46274,
+   "hit": 0.7329,
+   "stated": 0.7303,
+   "roiBet365": -0.0306,
+   "nBet365": 11391,
+   "roiBest": 0.0166,
+   "nBest": 11391
+  },
+  "mainPricedOnly": {
+   "n": 11391,
+   "hit": 0.737,
+   "stated": 0.7296,
+   "roiBet365": -0.0306,
+   "nBet365": 11391,
+   "roiBest": 0.0166,
+   "nBest": 11391
+  },
+  "safer": {
+   "n": 16151,
+   "hit": 0.819,
+   "stated": 0.8132,
+   "roiBet365": -0.0398,
+   "nBet365": 5635,
+   "roiBest": 0.007,
+   "nBest": 5635
+  },
+  "value": {
+   "n": 7503,
+   "hit": 0.4445,
+   "stated": 0.4482,
+   "roiBet365": -0.0125,
+   "nBet365": 7503,
+   "roiBest": 0.0634,
+   "nBest": 7503
+  },
+  "v5rule": {
+   "n": 46501,
+   "hit": 0.7496,
+   "stated": 0.7408,
+   "roiBet365": -0.0433,
+   "nBet365": 9880,
+   "roiBest": 0.003,
+   "nBest": 9880
+  },
+  "avoid": {
+   "n": 53349,
+   "won": 0.5041,
+   "marketSaid": 0.5398,
+   "v6Said": 0.5012
+  },
+  "grades": {
+   "Medium": {
+    "n": 6548,
+    "hit": 0.6799,
+    "stated": 0.6699,
+    "roiBet365": -0.0033,
+    "nBet365": 1905,
+    "roiBest": 0.0389,
+    "nBest": 1905
+   },
+   "High": {
+    "n": 38948,
+    "hit": 0.7449,
+    "stated": 0.7437,
+    "roiBet365": -0.0356,
+    "nBet365": 9460,
+    "roiBest": 0.0127,
+    "nBest": 9460
+   },
+   "Low": {
+    "n": 778,
+    "hit": 0.581,
+    "stated": 0.5656,
+    "roiBet365": -0.2177,
+    "nBet365": 26,
+    "roiBest": -0.1896,
+    "nBest": 26
+   }
+  },
+  "logloss": {
+   "1": {
+    "n": 47337,
+    "v6": 0.6264,
+    "priceOnly": 0.6267
+   },
+   "2": {
+    "n": 47337,
+    "v6": 0.563,
+    "priceOnly": 0.5633
+   },
+   "X": {
+    "n": 47337,
+    "v6": 0.5692,
+    "priceOnly": 0.5693
+   },
+   "O1.5": {
+    "n": 47337,
+    "v6": 0.5594,
+    "priceOnly": 0.5602
+   },
+   "O2.5": {
+    "n": 47337,
+    "v6": 0.6764,
+    "priceOnly": 0.6779
+   },
+   "O3.5": {
+    "n": 47337,
+    "v6": 0.5726,
+    "priceOnly": 0.5737
+   },
+   "BTTS_Y": {
+    "n": 47337,
+    "v6": 0.6864,
+    "priceOnly": 0.6879
+   },
+   "TTH_O0.5": {
+    "n": 47337,
+    "v6": 0.5244,
+    "priceOnly": 0.5251
+   },
+   "TTA_O0.5": {
+    "n": 47337,
+    "v6": 0.6008,
+    "priceOnly": 0.6012
+   },
+   "TTH_O1.5": {
+    "n": 47337,
+    "v6": 0.6382,
+    "priceOnly": 0.6389
+   },
+   "TTA_O1.5": {
+    "n": 47337,
+    "v6": 0.599,
+    "priceOnly": 0.5994
+   }
+  }
+ },
+ "grades": {
+  "High": {
+   "n": 23935,
+   "hit": 0.7393,
+   "stated": 0.744,
+   "roiBet365": -0.0435,
+   "nBet365": 6325,
+   "roiBest": -0.0038,
+   "nBest": 6325
+  },
+  "Medium": {
+   "n": 4147,
+   "hit": 0.6757,
+   "stated": 0.6703,
+   "roiBet365": -0.0065,
+   "nBet365": 1447,
+   "roiBest": 0.0251,
+   "nBest": 1447
+  },
+  "Low": {
+   "n": 373,
+   "hit": 0.5389,
+   "stated": 0.5604,
+   "roiBet365": -0.1024,
+   "nBet365": 17,
+   "roiBest": -0.0853,
+   "nBest": 17
+  }
+ },
+ "note": "Main pick = most likely selection paying >= 1.30, ranked by probability + 2 x the factors' disagreement with the price, never a trap. Value = best price >= 5% above the v6 fair price. Thresholds chosen on 2019-23, reported on 2023-26."
+}

@@ -118,6 +118,7 @@ function summaryFor(id) {
   if (!f) return null;
   return {
     lastFiveGames: [lastFive(f.home), lastFive(f.away)],
+    gameInfo: { venue: { fullName: `${f.home} Stadium`, address: { city: f.home === 'Arsenal' ? 'London' : 'Sunderland', country: 'England' } } },
     seasonseries: [],
     standings: { groups: [] },
     news: { articles: [{ headline: `${f.home} boss confident ahead of ${f.away} clash`, description: 'Preview.' }] },
@@ -169,7 +170,17 @@ const FD_FIX = [
   `E0,${ddmmyyyy(kick)},23:30,Sunderland,Brighton,3.10,3.40,2.30,3.20,3.45,2.33,3.05,3.35,2.30,3.30,3.55,2.42,1.95,1.90,1.97,1.93,1.93,1.88,2.02,1.98,0.25,1.95,1.95`,
 ].join('\n');
 
-const ELO_CSV = ['Rank,Club,Country,Level,Elo,From,To', '1,Arsenal,ENG,1,2010,2026-10-01,2026-10-20', '20,Leeds,ENG,1,1720,2026-10-01,2026-10-20', '25,Sunderland,ENG,1,1700,2026-10-01,2026-10-20', '12,Brighton,ENG,1,1800,2026-10-01,2026-10-20'].join('\n');
+const ELO_BASE = { Arsenal: 2010, Leeds: 1720, Sunderland: 1700, Brighton: 1800 };
+function eloCsv(dateStr) {
+  const age = (Date.now() - Date.parse(dateStr + 'T00:00:00Z')) / 86400000;
+  const drift = { Arsenal: age > 60 ? -25 : age > 20 ? -10 : 0, Leeds: age > 60 ? 20 : 0, Sunderland: age > 60 ? -30 : age > 20 ? -12 : 0, Brighton: 0 };
+  return ['Rank,Club,Country,Level,Elo,From,To', ...Object.entries(ELO_BASE).map(([c, e], i) => `${i + 1},${c},ENG,1,${e + drift[c]},${dateStr},${dateStr}`)].join('\n');
+}
+const HOURLY = (day) => {
+  const time = [];
+  for (let h = 0; h < 24; h++) time.push(`${day}T${String(h).padStart(2, '0')}:00`);
+  return { time, temperature_2m: time.map(() => 11.5), precipitation: time.map(() => 0.2), precipitation_probability: time.map(() => 30), wind_speed_10m: time.map(() => 14), wind_gusts_10m: time.map(() => 30), weather_code: time.map(() => 61) };
+};
 
 // ------------------------------------------------------------------ the stubbed internet
 const hits = {};
@@ -211,13 +222,19 @@ global.fetch = async (input, init) => {
     return reply(404, 'not found', 'text/plain');
   }
   if (u.hostname === 'www.football-data.co.uk') {
+    if (p === '/robots.txt') return reply(200, 'User-agent: *\nDisallow: /cgi-bin/\n', 'text/plain');
     if (p === '/fixtures.csv') return reply(200, FD_FIX, 'text/csv');
     const m = /\/mmz4281\/(\d{4})\/E0\.csv$/.exec(p);
-    if (m && (m[1] === '2526' || m[1] === '2627')) return reply(200, fs.readFileSync(path.join(FIX, `fd-E0-${m[1]}.csv`), 'utf8'), 'text/csv');
+    if (m && fs.existsSync(path.join(FIX, `fd-E0-${m[1]}.csv`))) return reply(200, fs.readFileSync(path.join(FIX, `fd-E0-${m[1]}.csv`), 'utf8'), 'text/csv');
     return reply(404, 'not found', 'text/plain');
   }
+  if (u.hostname === 'geocoding-api.open-meteo.com') {
+    const name = u.searchParams.get('name');
+    return reply(200, { results: [{ name, latitude: name === 'London' ? 51.5072 : 54.9061, longitude: name === 'London' ? -0.1276 : -1.3811, country: 'United Kingdom', country_code: 'GB' }] });
+  }
+  if (u.hostname === 'api.open-meteo.com') return reply(200, { hourly: HOURLY(u.searchParams.get('start_date')) });
   if (u.hostname === 'fantasy.premierleague.com') return reply(200, FPL);
-  if (u.hostname === 'api.clubelo.com') return reply(200, ELO_CSV, 'text/csv');
+  if (u.hostname === 'api.clubelo.com') return reply(200, eloCsv(p.slice(1, 11)), 'text/csv');
   if (u.hostname === 'api.infersports.dev') return reply(503, { error: 'offline test' });
   return reply(404, {});
 };
@@ -257,7 +274,10 @@ global.fetch = async (input, init) => {
     t('Bet365 fractional prices parsed from the ESPN summary', rep.consensus.books.some((b) => /bet ?365/i.test(b)));
     const prov = rep.dataProvenance.results && rep.dataProvenance.results.home;
     t('league results loaded from several sources', prov && prov.n > 300 && prov.sources.length >= 2, JSON.stringify(prov && { n: prov.n, sources: prov.sources }));
-    t('most results verified by a second source', prov && prov.verifiedShare > 0.9, prov && prov.verifiedShare);
+    const multi = prov && prov.seasons.filter((x) => x.sources && x.sources.length >= 1 && x.checked);
+    const twoSrc = (prov && prov.seasons || []).filter((x) => x.season >= 2025);
+    t('seasons with a second source are >90% verified', twoSrc.length >= 2 && twoSrc.every((x) => x.verifiedShare > 0.9), JSON.stringify(twoSrc.map((x) => [x.season, x.verifiedShare])));
+    t('a season only one source has is reported as unverified, not passed off', (prov.seasons.find((x) => x.season === 2024) || {}).verifiedShare === 0, JSON.stringify(multi && multi.map((x) => [x.season, x.primary, x.verifiedShare])));
     t('per-game history comes from the verified results (12 games a side)', rep.dataProvenance.hasHistory && rep.dataProvenance.historySource === 'verified-results' && rep.dataProvenance.historySample.home === 12, JSON.stringify(rep.dataProvenance.historySample));
     t('older seasons are translated into the fixture spelling', prov && prov.canonicalSource === 'espn');
     t('best bet label names the club, not "Home"', rep.general.bestBet && !/^Home |^Away /.test(rep.general.bestBet.label), rep.general.bestBet && rep.general.bestBet.label);
@@ -273,12 +293,42 @@ global.fetch = async (input, init) => {
     t('correct-score methodology never takes the headline', !rep.methodology.headline || rep.methodology.headline.id !== 'correctScore');
     t('report is JSON-serialisable', (() => { try { JSON.stringify(rep); return true; } catch { return false; } })());
 
+    // ---------------------------------------------------------------- v6 match intelligence
+    const I = rep.intel || {};
+    t('v6 intelligence available', I.available === true, I.reason);
+    t('v6 forecast starts from the price and adds the factors', I.source === 'market+factors', I.source);
+    t('v6 price comes from football-data\'s own fixture row (training definition)', /football-data/.test(I.priceSource || ''), I.priceSource);
+    t('crawled archive: four seasons of E0 with shots and odds', I.data && I.data.archive && I.data.archive['eng.1'] && I.data.archive['eng.1'].matches > 1000 && I.data.archive['eng.1'].withStats > 1000, JSON.stringify(I.data && I.data.archive && I.data.archive['eng.1'] && { m: I.data.archive['eng.1'].matches, s: I.data.archive['eng.1'].withStats }));
+    t('names resolved to the archive spelling (Leeds United -> Leeds)', I.names && I.names.home === 'Arsenal' && I.names.away === 'Leeds', JSON.stringify(I.names));
+    t('most of the 170 factors measured', I.coverage > 0.75, I.coverage);
+    t('shots-based factors present', I.factors && I.factors.h_sotShare != null && I.factors.a_xga10 != null);
+    t('Elo momentum from three ClubElo snapshots', I.factors && I.factors.h_eloChg90 === 25, I.factors && I.factors.h_eloChg90);
+    t('head-to-head meetings found in the archive', I.h2h && I.h2h.length >= 2, I.h2h && I.h2h.length);
+    t('league table on the day', I.table && I.table.home && I.table.home.pos >= 1);
+    t('trend rows for both teams (10 games)', I.trends && I.trends.home.length === 10 && I.trends.away.length === 10);
+    t('factor families explained in plain English', I.families && I.families.length >= 10 && I.families.find((g) => g.id === 'form').facts.some((x) => /Arsenal/.test(x)), JSON.stringify(I.families && I.families.map((g) => g.id)));
+    t('families carry measured importance', I.families.every((g) => g.importance && (g.importance.withMarket != null || g.importance.factorsOnly != null)));
+    t('a main pick with a take-at price', I.decision && I.decision.main && I.decision.main.takeAt >= 1.05 && /Arsenal|Leeds|goals|score/.test(I.decision.main.label), JSON.stringify(I.decision && I.decision.main));
+    t('confidence carries its measured record', I.decision.confidence && I.decision.confidence.level && I.decision.confidence.measured && I.decision.confidence.measured.n > 1000, JSON.stringify(I.decision.confidence));
+    t('patterns carry measured verdicts', Array.isArray(I.patterns) && I.patterns.every((x) => ['trap', 'edge', 'weak', 'unstable', 'priced-in'].includes(x.verdict)), JSON.stringify(I.patterns && I.patterns.map((x) => x.verdict)));
+    t('weather at kick-off (context only)', I.context && I.context.weather && I.context.weather.tempC === 11.5 && I.context.weather.place === 'London', JSON.stringify(I.context && I.context.weather));
+    t('v6 probabilities are coherent (1X2 sums to one)', Math.abs(I.probs['1'] + I.probs.X + I.probs['2'] - 1) < 1e-3);
+    t('general prediction is v6 and uses the v6 main pick', rep.general.version === '6.0' && rep.general.bestBet && rep.general.bestBet.key === I.decision.main.key, rep.general.version);
+
     const rep2 = (await get(`/api/analysis?league=eng.1&event=9002&date=${day}`)).body;
     t('second fixture analysable', rep2.analysable === true, rep2.reason || rep2.error);
 
     const preds = (await get(`/api/predictions?date=${day}`)).body;
     t('predictions endpoint returns a general prediction for every fixture', preds.general && preds.general.length === 2, preds.error);
     t('predictions list methods with counts', Array.isArray(preds.methods) && preds.methods.length === 13);
+    t('predictions carry the double-confirmed accumulator', preds.accumulator && Array.isArray(preds.accumulator.legs) && Array.isArray(preds.accumulator.options) && preds.accumulator.rules.length >= 3, JSON.stringify(preds.accumulator && { legs: preds.accumulator.legs.length, err: preds.accumulator.error }));
+    t('every accumulator leg passed a methodology AND the normal prediction', (preds.accumulator.legs || []).every((l) => ['LOCK', 'PREDICT'].includes(l.methodology.status) && ['main', 'call', 'safer'].includes(l.agreement)));
+    const acc = (await get(`/api/accumulator?date=${day}`)).body;
+    t('accumulator endpoint', acc.accumulator && Array.isArray(acc.accumulator.options), JSON.stringify(acc).slice(0, 200));
+    const crawl = (await get('/api/crawler')).body;
+    t('crawler reports football-data requests and honours robots.txt', crawl.hosts && crawl.hosts['www.football-data.co.uk'] && crawl.hosts['www.football-data.co.uk'].ok >= 2 && crawl.hosts['www.football-data.co.uk'].robotsBlocked === 0, JSON.stringify(crawl.hosts && crawl.hosts['www.football-data.co.uk']));
+    const ir = (await get('/api/intel-research')).body;
+    t('research record served (decision, accumulator, importance, patterns)', ir.record && ir.accumulator && ir.importance && ir.patterns && Object.keys(ir.patterns.rules).length >= 40);
 
     const meth = (await get('/api/methodology')).body;
     t('methodology endpoint is v5 with backtest numbers', meth.version === '5.0' && meth.backtest && meth.backtest.headline && meth.backtest.headline.v5.n > 1000);
@@ -315,7 +365,7 @@ global.fetch = async (input, init) => {
       const board = w.document.querySelector('#board').textContent;
       t('Matches tab lists the fixtures', /Arsenal/.test(board) && /Sunderland/.test(board), board.slice(0, 200));
       t('Matches tab shows predicted score chips', w.document.querySelectorAll('.sc-chip').length === 2);
-      for (const view of ['predictions', 'top', 'general', 'record', 'method']) {
+      for (const view of ['predictions', 'top', 'general', 'acca', 'record', 'method']) {
         w.eval(`setView(${JSON.stringify(view)})`);
         await settle(1200);
         const txt = w.document.querySelector('#board').textContent;
@@ -325,6 +375,8 @@ global.fetch = async (input, init) => {
       await settle(1500);
       const det = w.document.querySelector('#detailInner').textContent;
       t('detail panel shows the predicted final score', /Predicted final score/.test(det));
+      t('detail panel shows the match intelligence', /Match intelligence/.test(det) && /Form & trend/.test(det) && /Head-to-head/.test(det), det.slice(0, 200));
+      t('detail panel shows patterns and traps', /Patterns & traps/.test(det));
       t('detail panel shows how the probabilities were built', /How the probabilities were built/.test(det));
       t('detail panel shows FPL availability', /Saliba/.test(det));
       t('detail panel shows all 13 methodologies', /All 13 methodologies/.test(det));

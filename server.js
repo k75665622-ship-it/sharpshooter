@@ -17,6 +17,9 @@
  *   GET /api/sources-check            -> probes candidate free data sources from this server
  *   GET /api/methodology              -> the thirteen v5 methodologies, thresholds and backtest record
  *   GET /api/ledger[?format=csv]      -> live track record (predictions recorded pre-match, settled after)
+ *   GET /api/accumulator?date=        -> v6 double-confirmed accumulator (methodology + normal prediction agree)
+ *   GET /api/crawler                  -> v6 crawler status: per-source requests, cache hits, robots, pauses
+ *   GET /api/intel-research           -> v6 research record: factor importance, patterns, decision backtest
  */
 
 const http = require('http');
@@ -31,6 +34,17 @@ const IS = require('./lib/infersports');
 const MI = require('./lib/methodology');
 const LEDGER = require('./lib/ledger');
 const BACKTEST = require('./lib/backtest.json');
+const ACC = require('./lib/intel/accumulator');
+const HTTPC = require('./lib/crawler/http');
+const WH = require('./lib/crawler/warehouse');
+
+const readJson = (f) => {
+  try {
+    return require(f);
+  } catch {
+    return null;
+  }
+};
 
 const PORT = process.env.PORT != null && process.env.PORT !== '' && Number.isFinite(Number(process.env.PORT)) ? Number(process.env.PORT) : 3000;
 // Hosted platforms (Render, Railway, Fly, Heroku) set PORT and route traffic to the
@@ -103,6 +117,7 @@ function serveStatic(req, res, urlPath) {
 /** Analysis cache for deep reports (5 min). */
 const analysisCache = new Map();
 const ANALYSIS_TTL = 5 * 60 * 1000;
+let lastWarm = 0;
 
 async function buildBoard(dateYmd) {
   const leagues = L.CORE_SLUGS;
@@ -142,6 +157,14 @@ async function buildBoard(dateYmd) {
   }
 
   const leagueList = [...groups.values()].sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name));
+
+  // v6: crawl the archive for the leagues on the board in the background (politely, cached),
+  // so the first deep analysis of each fixture does not wait for the downloads.
+  if (dateYmd === todayUTC() && Date.now() - lastWarm > 30 * 60 * 1000) {
+    lastWarm = Date.now();
+    const slugs = leagueList.map((g) => g.slug);
+    setImmediate(() => WH.warm(slugs).catch(() => 0));
+  }
 
   return {
     date: isoFromYmd(dateYmd),
@@ -291,6 +314,14 @@ async function buildPredictions(dateYmd, limit) {
   }
   const agg = E.collectPredictions(reports);
   const analysable = reports.filter((r) => r.analysable);
+  // v6: the double-confirmed accumulator (a leg must pass a methodology AND the normal prediction)
+  let accumulator = null;
+  try {
+    accumulator = ACC.forReports(reports);
+    LEDGER.recordAcca(accumulator, isoFromYmd(dateYmd));
+  } catch (err) {
+    accumulator = { error: String(err && err.message ? err.message : err), legs: [], options: [] };
+  }
   const withHistory = analysable.filter((r) => r.dataProvenance && r.dataProvenance.hasHistory).length;
   const withElo = analysable.filter((r) => r.dataProvenance && r.dataProvenance.hasElo).length;
   const statusCounts = {};
@@ -312,6 +343,7 @@ async function buildPredictions(dateYmd, limit) {
       .filter((r) => r.general && !r.general.error)
       .map((r) => ({ match: briefFull(r.match), general: r.general, methodology: r.methodology && r.methodology.headline ? { id: r.methodology.headline.id, status: r.methodology.headline.status, label: r.methodology.headline.pick.label } : null }))
       .sort((a, b) => new Date(a.match.date) - new Date(b.match.date)),
+    accumulator,
     skipped: analysable.length - agg.headline.length,
     unanalysable: reports.filter((r) => !r.analysable).map((r) => ({ match: brief(r.match), reason: r.reason || null })),
   };
@@ -376,7 +408,12 @@ const server = http.createServer(async (req, res) => {
           'raw.githubusercontent.com/openfootball/football.json  (19+ leagues, v5)',
           'football-data.co.uk  (results + multi-book odds incl. Pinnacle, v5)',
           'fantasy.premierleague.com/api/bootstrap-static  (Premier League availability, v5)',
+          'football-data.co.uk/mmz4281/{season}/{league}.csv  (shots, corners, cards, half-time, opening+closing odds; 6 seasons, v6 crawler)',
+          'football-data.co.uk/fixtures.csv  (upcoming fixtures: Bet365 + best-of-market prices, v6 crawler)',
+          'api.clubelo.com/{date}  x3  (Elo now, 30 and 90 days ago: momentum, v6)',
+          'geocoding-api.open-meteo.com + api.open-meteo.com  (kick-off weather, context only, v6)',
         ],
+        crawler: Object.fromEntries(Object.entries(HTTPC.stats()).map(([h, s2]) => [h, { requests: s2.requests, cacheHits: s2.cacheHits, notModified: s2.notModified, errors: s2.errors, paused: s2.paused }])),
         // Secondary source diagnostics. `errors` here is informational: the
         // engine is designed to run correctly with this source unavailable.
         asianSource: IS.netStats(),
@@ -450,6 +487,26 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, LEDGER.summary());
     }
 
+    if (p === '/api/accumulator') {
+      const dateYmd = normaliseDate(url.searchParams.get('date'));
+      const limit = Number(url.searchParams.get('limit')) || 60;
+      const out = await buildPredictions(dateYmd, limit);
+      return json(res, 200, { date: out.date, accumulator: out.accumulator });
+    }
+
+    if (p === '/api/crawler') {
+      return json(res, 200, { hosts: HTTPC.stats(), warehouse: WH.status(), userAgent: HTTPC.UA });
+    }
+
+    if (p === '/api/intel-research') {
+      return json(res, 200, {
+        record: readJson('./lib/intel/record.json'),
+        accumulator: readJson('./lib/intel/acca_record.json'),
+        importance: readJson('./lib/intel/importance.json'),
+        patterns: readJson('./lib/intel/rules.json'),
+      });
+    }
+
     if (p === '/api/bankers') {
       const dateYmd = normaliseDate(url.searchParams.get('date'));
       const limit = Number(url.searchParams.get('limit')) || 60;
@@ -474,6 +531,8 @@ server.listen(PORT, HOST, () => {
   console.log('              api.infersports.dev     (Asian books, multi-line)');
   console.log('              openfootball results    (per-game history, 0/1/2+ goal evidence)');
   console.log('              api.clubelo.com         (independent Elo strength read)');
+  console.log('              football-data.co.uk     (v6 crawler: stats, half-times, odds history)');
+  console.log('              api.open-meteo.com      (kick-off weather, context)');
   console.log('              all free and keyless');
   const q = IS.quotaSnapshot();
   console.log(`  Odds quota  ${q.limit == null ? 'unknown' : q.limit}/day` +

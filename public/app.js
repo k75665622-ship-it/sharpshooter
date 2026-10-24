@@ -269,7 +269,7 @@ function renderDetail(rep) {
     return;
   }
 
-  el.innerHTML = head + generalSection(rep) + methodologySection(rep) + ensembleSection(rep)
+  el.innerHTML = head + generalSection(rep) + intelSection(rep) + intelTrapsSection(rep) + methodologySection(rep) + ensembleSection(rep)
     + availabilitySection(rep) + modelSection(rep) + marketSection(rep)
     + patternSection(rep) + trapSection(rep) + lineMovementSection(rep)
     + h2hSection(rep) + formSection(rep) + provenanceSection(rep) + newsSection(rep);
@@ -325,12 +325,110 @@ function generalSection(rep) {
       </div>
     </div>
     ${bb ? `<div class="gp-best">
-      <div class="gp-k">${g.source === 'methodology' ? `Best bet · from ${esc(bb.methodology)} (${esc(statusMeta(bb.status).label)})` : 'Best bet · most likely selection paying ≥ 1.30'}</div>
+      <div class="gp-k">${g.version === '6.0' ? 'Main pick · v6 match decision' : g.source === 'methodology' ? `Best bet · from ${esc(bb.methodology)} (${esc(statusMeta(bb.status).label)})` : 'Best bet · most likely selection paying ≥ 1.30'}</div>
       <div class="gp-bb">${esc(bb.label)} <em>${pct(bb.prob, 0)}</em></div>
-      <div class="gp-sub">Fair odds ${dec(bb.fairOdds)} · take it at <b>${dec(bb.valuePrice)}</b> or better${bb.best ? ` · best seen ${dec(bb.best)} (${esc(bb.bestBook || '')})` : ''}${bb.modelProb != null ? ` · independent model ${pct(bb.modelProb, 0)}` : ''}</div>
+      <div class="gp-sub">Fair odds ${dec(bb.fairOdds)} · take it at <b>${dec(bb.valuePrice)}</b> or better${bb.best ? ` · best seen ${dec(bb.best)} (${esc(bb.bestBook || '')})` : ''}${bb.modelProb != null ? ` · independent model ${pct(bb.modelProb, 0)}` : ''}${bb.baseProb != null ? ` · price alone ${pct(bb.baseProb, 0)}` : ''}</div>
+      ${g.confidence && g.confidence.measured ? `<div class="gp-sub">${esc(g.confidence.level)}-confidence picks won <b>${pct(g.confidence.measured.hit, 1)}</b> (stated ${pct(g.confidence.measured.stated, 1)}) on ${g.confidence.measured.n.toLocaleString()} held-out matches.</div>` : ''}
+      ${g.methodologyPick ? `<div class="gp-sub">${g.methodologyPick.agrees ? '✓ Also qualifies' : 'Methodology pick'}: <b>${esc(g.methodologyPick.label)}</b> — ${esc(g.methodologyPick.name)} (${esc(statusMeta(g.methodologyPick.status).label)})</div>` : ''}
     </div>` : ''}
+    ${(g.alternatives || []).length && !(rep.intel && rep.intel.available) ? `<div class="gp-alts">${g.alternatives.map((a) => `<div class="gp-alt ${esc(a.role)}"><span>${a.role === 'value' ? 'Value pick' : a.role === 'safer' ? 'Safer pick' : 'Also'}</span><b>${esc(a.label)}</b> <em>${pct(a.prob, 0)}</em>
+      <small>${a.role === 'value' && a.best ? `best ${dec(a.best)}${a.bestBook ? ' (' + esc(a.bestBook) + ')' : ''} vs fair ${dec(a.fairOdds)}${a.ev != null ? ' · edge ' + signed(a.ev * 100, 1) + '%' : ''}` : `take at ≥ ${dec(a.valuePrice)}`}</small></div>`).join('')}</div>` : ''}
+    ${(g.avoid || []).length && !(rep.intel && rep.intel.available) ? `<div class="gp-avoid"><span>Avoid</span>${g.avoid.map((a) => `<b title="price ${pct(a.baseProb, 0)} vs factors ${pct(a.prob, 0)}">${esc(a.label)} <small>${signed((a.shift || 0) * 100, 1)} pts</small></b>`).join('')}</div>` : ''}
     ${scoreGrid(g, m.home.short || m.home.name, m.away.short || m.away.name)}
     <div class="gp-sum">${esc(g.summary)}</div>
+  </div>`;
+}
+
+/* ---------------------------------------------------------- v6 match intelligence */
+
+const VERDICT = {
+  trap: { cls: 'v-trap', label: 'Confirmed trap' },
+  edge: { cls: 'v-edge', label: 'Confirmed edge' },
+  weak: { cls: 'v-weak', label: 'Weak signal' },
+  unstable: { cls: 'v-weak', label: 'Unstable' },
+  'priced-in': { cls: 'v-priced', label: 'Priced in' },
+  untested: { cls: 'v-priced', label: 'Untested' },
+};
+const TRAP_KIND = { model: 'Factors', rule: 'Pattern', data: 'Data', context: 'Context' };
+
+function decisionCard(x, title, cls) {
+  if (!x) return '';
+  return `<div class="dc ${cls}"><div class="dc-k">${esc(title)}</div><div class="dc-l">${esc(x.label)} <em>${pct(x.prob, 0)}</em></div>
+    <div class="dc-s">${x.base != null ? `price alone ${pct(x.base, 0)} · factors ${signed((x.prob - x.base) * 100, 1)} pts · ` : ''}fair ${dec(x.fair)} · take at <b>${dec(x.takeAt)}</b>${x.best ? ` · best seen ${dec(x.best)}${x.bestBook ? ' (' + esc(x.bestBook) + ')' : ''}` : ''}${/value/.test(cls) && x.ev != null ? ` · edge <b class="pos">${signed(x.ev * 100, 1)}%</b>` : ''}</div></div>`;
+}
+
+function trendTable(rows, name) {
+  if (!rows || !rows.length) return `<div class="tr-side"><div class="tr-h">${esc(name)}</div><div class="muted-t">No archived games.</div></div>`;
+  const chips = rows.slice().reverse().map((g) => `<span class="fb ${g.res}" title="${esc(g.date)} ${g.venue === 'H' ? 'v' : '@'} ${esc(g.opp)} ${g.gf}-${g.ga}">${g.res}</span>`).join('');
+  return `<div class="tr-side"><div class="tr-h">${esc(name)} <span class="mr-form">${chips}</span></div>
+    <div class="tr-t"><div class="tr-r head"><span>Date</span><span>Opponent</span><span>Score</span><span>HT</span><span>Shots on tgt</span><span>vs odds</span></div>
+    ${rows.map((g) => `<div class="tr-r"><span>${esc(String(g.date).slice(5))}</span><span>${g.venue === 'H' ? 'v' : '@'} ${esc(g.opp)}</span>
+      <span class="sc ${g.res}">${g.gf}-${g.ga}</span><span>${g.htgf != null ? g.htgf + '-' + g.htga : '—'}</span>
+      <span>${g.sotf != null ? g.sotf + '-' + g.sota : '—'}</span><span class="${g.pve > 0 ? 'pos' : g.pve < 0 ? 'neg' : ''}">${g.pve == null ? '—' : signed(g.pve, 1)}</span></div>`).join('')}</div></div>`;
+}
+
+function intelSection(rep) {
+  const I = rep.intel;
+  if (!I) return '';
+  if (!I.available) {
+    return `<div class="sec"><div class="sec-title">Match intelligence <span class="pill">v6</span></div><div class="src-note">${esc(I.reason || 'Not available for this fixture.')}</div></div>`;
+  }
+  const m = rep.match;
+  const d = I.decision || {};
+  const conf = d.confidence || {};
+  const why = (I.topPull || []).length
+    ? `<div class="why"><div class="why-h">What moved the forecast for <b>${esc(d.main ? d.main.label : 'the pick')}</b> (vs the price alone)</div>
+      ${I.topPull.map((p) => `<div class="why-r"><span>${esc(p.label)}</span><span class="why-bar"><i class="${p.pts >= 0 ? 'up' : 'dn'}" style="width:${Math.min(100, Math.abs(p.pts) * 30).toFixed(0)}%"></i></span><b class="${p.pts >= 0 ? 'pos' : 'neg'}">${signed(p.pts, 1)}</b></div>`).join('')}</div>`
+    : '';
+  const fams = (I.families || []).map((g) => {
+    const iw = g.importance ? g.importance.withMarket : null;
+    const io = g.importance ? g.importance.factorsOnly : null;
+    return `<details class="fam"><summary><span class="fam-n">${esc(g.name)}</span>
+      <span class="fam-imp" title="Measured share of the model's decisions on held-out seasons — with a price / with no price">
+        <span class="imp-bar"><i style="width:${Math.round((iw || 0) * 300)}%"></i></span>${iw != null ? pct(iw, 0) : '—'}<small> / ${io != null ? pct(io, 0) : '—'}</small></span>
+      <span class="fam-pull ${g.pull > 0 ? 'pos' : g.pull < 0 ? 'neg' : ''}">${g.pull == null ? '' : signed(g.pull, 1) + ' pts'}</span></summary>
+      <div class="fam-b"><div class="fam-blurb">${esc(g.blurb)}</div>${g.facts.length ? g.facts.map((f) => `<div class="fact">${esc(f)}</div>`).join('') : '<div class="fact muted-t">Not enough data for this family.</div>'}</div></details>`;
+  }).join('');
+  const w = I.context && I.context.weather;
+  const rest = I.context && I.context.restAllComps;
+  const arch = I.data && I.data.archive ? Object.values(I.data.archive) : [];
+  return `<div class="sec"><div class="sec-title">Match intelligence <span class="pill">v6 · ${esc(I.source === 'market+factors' ? 'price + factors' : 'factors only')}</span>
+      <span class="badge st-${CONF_CLS[conf.level] || 'watch'}" title="${esc((conf.reasons || []).join(' · '))}">${esc(conf.level || '—')}</span></div>
+    <div class="dcs">
+      ${decisionCard(d.main, d.value && d.main && d.value.key === d.main.key ? 'Main pick · also the value pick' : 'Main pick', d.value && d.main && d.value.key === d.main.key ? 'main value' : 'main')}
+      ${decisionCard(d.safer, 'Safer pick', 'safer')}
+      ${d.value && (!d.main || d.value.key !== d.main.key) ? decisionCard(d.value, 'Value pick (best price beats fair)', 'value') : ''}
+    </div>
+    ${(d.avoid || []).length ? `<div class="dc avoid"><div class="dc-k">Avoid — the factors say the price overrates these</div>${d.avoid.map((a) => `<div class="dc-s"><b>${esc(a.label)}</b> — price ${pct(a.base, 0)}, factors ${pct(a.prob, 0)} (${signed((a.shift || 0) * 100, 1)} pts)${a.rule ? ' · confirmed trap pattern' : ''}</div>`).join('')}</div>` : ''}
+    ${conf.measured ? `<div class="meas-note">${esc(conf.level)}-confidence main picks won <b>${pct(conf.measured.hit, 1)}</b> (stated ${pct(conf.measured.stated, 1)}) on ${conf.measured.n.toLocaleString()} held-out matches.${(conf.reasons || []).length ? ' ' + esc(conf.reasons.join(' · ')) + '.' : ''}</div>` : ''}
+    ${why}
+    <div class="fam-h"><span>Factor family</span><span>Weight <small>with price / without</small></span><span>Pull</span></div>
+    ${fams}
+    <div class="trends">${trendTable(I.trends && I.trends.home, m.home.name)}${trendTable(I.trends && I.trends.away, m.away.name)}</div>
+    ${I.h2h && I.h2h.length ? `<div class="h2h6"><div class="tr-h">Head-to-head (league, 6 years)</div>${I.h2h.map((x) => `<div class="h2h6-r"><span>${esc(x.date)}</span><span>${esc(x.home)} <b>${x.hg}-${x.ag}</b> ${esc(x.away)}</span></div>`).join('')}</div>` : ''}
+    <div class="ctx">
+      ${w ? `<span>☁ ${esc(w.place)}: ${w.tempC != null ? Math.round(w.tempC) + '°C' : ''} ${esc(w.description || '')}${w.precipMm != null ? ', ' + w.precipMm + ' mm rain' : ''}${w.windKmh != null ? ', wind ' + Math.round(w.windKmh) + ' km/h' : ''} <small>(context only — not in the model)</small></span>` : ''}
+      ${rest && (rest.home != null || rest.away != null) ? `<span>Days since last game, any competition: ${esc(m.home.short || m.home.name)} ${rest.home ?? '—'}, ${esc(m.away.short || m.away.name)} ${rest.away ?? '—'}</span>` : ''}
+      <span>${I.factorsKnown}/${I.factorsTotal} factors measured · price: ${esc(I.priceSource || 'none')}</span>
+      ${arch.length ? `<span>Archive: ${arch.map((a) => `${esc(a.div || a.slug)} ${a.matches || 0} games (${a.withStats || 0} with shots)`).join(' · ')}</span>` : ''}
+    </div>
+  </div>`;
+}
+
+function intelTrapsSection(rep) {
+  const I = rep.intel;
+  if (!I || !I.available) return '';
+  const traps = I.traps || [];
+  const pats = I.patterns || [];
+  if (!traps.length && !pats.length) return '';
+  return `<div class="sec"><div class="sec-title">Patterns &amp; traps <span class="pill">every claim tested on past seasons</span></div>
+    ${traps.length ? `<div class="traps6">${traps.map((t) => `<div class="trap6 k-${esc(t.kind)}"><span class="tk">${esc(TRAP_KIND[t.kind] || t.kind)}</span><div><b>${esc(t.label)}</b><div class="dc-s">${esc(t.detail || '')}</div></div></div>`).join('')}</div>` : '<div class="src-note">No trap flags on this fixture.</div>'}
+    ${pats.length ? `<div class="pats">${pats.map((p) => {
+      const v = VERDICT[p.verdict] || VERDICT.untested;
+      const e = p.evidence;
+      return `<div class="pat"><span class="verdict ${v.cls}">${esc(v.label)}</span><div><b>${esc(p.desc)}</b>
+        <div class="dc-s">${esc(p.plain)}${e && e.n ? ` — since 2023 the price said ${pct(e.said, 1)}, it won ${pct(e.won, 1)} (${e.n.toLocaleString()} matches)` : ''}</div></div></div>`;
+    }).join('')}</div>` : ''}
   </div>`;
 }
 
@@ -646,7 +744,7 @@ const STATUS_META = {
   WATCH:   { cls: 'watch',   label: 'Watch',      blurb: 'Close, but not enough evidence to call it.' },
   REMOVE:  { cls: 'remove',  label: 'No',         blurb: 'Fails a hard gate or too few checks.' },
 };
-const CONF_CLS = { High: 'lock', Medium: 'predict', Low: 'watch' };
+const CONF_CLS = { 'Very high': 'lock', High: 'lock', Medium: 'predict', Low: 'watch', None: 'remove' };
 const statusMeta = (s) => STATUS_META[s] || STATUS_META.REMOVE;
 const signed = (v, dp = 1) => (v == null ? '—' : (v > 0 ? '+' : '') + v.toFixed(dp));
 
@@ -910,11 +1008,12 @@ async function renderMethod() {
   const d = state.method;
   const c = d.config || {};
   const bt = d.backtest || {};
+  const v6 = await researchBlock();
   const cell = (x) => (x ? `${pct(x.hitRate, 1)} <small>said ${pct(x.statedProb, 1)} · n ${x.n.toLocaleString()}</small>` : '<small>—</small>');
   const roi = (x) => (x && x.roiBestPrice != null ? `<span class="${x.roiBestPrice >= 0 ? 'pos' : 'neg'}">${(x.roiBestPrice * 100).toFixed(1)}%</span>` : '—');
   const roi365 = (x) => (x && x.roiBet365 != null ? `<span class="${x.roiBet365 >= 0 ? 'pos' : 'neg'}">${(x.roiBet365 * 100).toFixed(1)}%</span>` : '—');
-  el.innerHTML = `<div class="m-intro">
-      <h2>How predictions are made — v${esc(d.version)}</h2>
+  el.innerHTML = v6 + `<div class="m-intro">
+      <h2>How predictions are made — methodologies v${esc(d.version)}</h2>
       <p>Every fixture gets a <b>general prediction</b> (result, goals, both-teams-to-score and a predicted final score) from one
       calibrated, market-anchored model. Then <b>${d.methods.length} market methodologies</b> decide which markets the match genuinely falls under:
       all hard gates must pass (unknown evidence counts as a fail), then at least <b>${Math.round((c.qualify || 0.85) * 100)}%</b> of the checklist.
@@ -988,8 +1087,11 @@ function renderGeneral() {
           <span>${esc(g.goals.call)} 2.5 <b>${pct(g.goals.prob, 0)}</b></span>
           <span>BTTS ${esc(g.btts.call)} <b>${pct(g.btts.prob, 0)}</b></span>
         </div>
-        ${bb ? `<div class="gc-best"><span class="gc-k">${g.source === 'methodology' ? esc(statusMeta(bb.status).label) + ' · ' + esc(bb.methodology) : 'Best bet'}</span>
+        ${bb ? `<div class="gc-best"><span class="gc-k">${g.version === '6.0' ? 'Main pick' : g.source === 'methodology' ? esc(statusMeta(bb.status).label) + ' · ' + esc(bb.methodology) : 'Best bet'}</span>
           <b>${esc(bb.label)}</b> ${pct(bb.prob, 0)} · take at ≥ ${dec(bb.valuePrice)}</div>` : ''}
+        ${g.version === '6.0' ? `<div class="gc-tags">${(g.alternatives || []).filter((a) => a.role === 'value').map((a) => `<span class="tag val" title="best ${dec(a.best)} vs fair ${dec(a.fairOdds)}">Value: ${esc(a.label)}</span>`).join('')}
+          ${g.methodologyPick && g.methodologyPick.agrees ? `<span class="tag ok">✓ ${esc(g.methodologyPick.name)}</span>` : ''}
+          ${(g.avoid || []).length ? `<span class="tag warn" title="${esc(g.avoid.map((a) => a.label).join(', '))}">Avoid ${g.avoid.length}</span>` : ''}</div>` : ''}
       </div>`;
     }).join('')}</div>`;
     el.innerHTML = html;
@@ -997,6 +1099,80 @@ function renderGeneral() {
   $$('.fchip', el).forEach((b) => b.addEventListener('click', () => { state.filter.conf = b.dataset.c; renderGeneral(); }));
   $$('.gcard', el).forEach((c) => c.addEventListener('click', () => openMatch(c.dataset.id, c.dataset.league, c.dataset.year)));
 }
+
+/* ---------------------------------------------------------- accumulator view (v6) */
+
+function accaRecordLine(r, label) {
+  if (!r || !r.n) return '';
+  return `<span>${esc(label)}: won <b>${pct(r.hit, 1)}</b> (stated ${pct(r.stated, 1)}, ${r.n.toLocaleString()} days)${r.roiBet365 != null ? ` · Bet365 <span class="${r.roiBet365 >= 0 ? 'pos' : 'neg'}">${signed(r.roiBet365 * 100, 1)}%</span>` : ''}${r.roiBest != null ? ` · best price <span class="${r.roiBest >= 0 ? 'pos' : 'neg'}">${signed(r.roiBest * 100, 1)}%</span> <small>(${r.nPricedBest} fully priced)</small>` : ''}</span>`;
+}
+
+function renderAcca() {
+  const el = $('#board');
+  const d = state.preds;
+  if (!d) { el.innerHTML = loadingBlock('Building the accumulator…', 'Every leg must pass a methodology AND the normal prediction.'); return; }
+  const a = d.accumulator || { legs: [], options: [], rules: [] };
+  const rec = a.record || null;
+  const ho = rec && rec.heldOut;
+  const legRow = (l) => `<div class="al" data-id="${esc(l.fixtureId)}" data-league="${esc(l.league)}">
+      <div class="al-m"><b>${esc(l.home)} v ${esc(l.away)}</b> <small>${esc(l.leagueName || l.league)} · ${esc(fmtTime(l.kickoff))}</small></div>
+      <div class="al-p"><b>${esc(l.label)}</b> <em>${pct(l.prob, 0)}</em>${l.best ? ` <small>best ${dec(l.best)}</small>` : ''}</div>
+      <div class="al-w"><span class="badge st-${statusMeta(l.methodology.status).cls}">${esc(statusMeta(l.methodology.status).label)}</span> ${esc(l.methodology.name)}
+        <span class="tag ok">${l.agreement === 'main' ? 'Normal: main pick' : l.agreement === 'safer' ? 'Normal: safer form of its pick' : 'Normal: agrees (' + esc([l.normal.calls.result, l.normal.calls.goals].filter(Boolean).join(', ')) + ')'}</span></div>
+    </div>`;
+  el.innerHTML = `<div class="m-intro"><h2>Accumulator — double-confirmed</h2>
+      <p>A match only goes in when <b>two independent layers agree</b>: the selection <b>qualifies under a methodology</b> (Lock or Predict), and the
+      <b>normal prediction says the same thing</b> — it is the normal main pick, a safer form of it, or it matches the normal prediction's result / goals / BTTS call
+      with at least ${pct(0.6, 0)} probability. Anything the normal prediction flags as overrated by the bookmakers is left out.</p>
+      <ul class="rules">${(a.rules || []).map((r) => `<li>${esc(r)}</li>`).join('')}</ul>
+      ${ho ? `<div class="acca-rec"><div class="tr-h">Tested on held-out seasons (${esc(String((ho.window || [])[0] || '').slice(0, 4))}–26), never used to build the rule</div>
+        ${['2', '3', '4', '5'].map((k) => accaRecordLine(ho.sizes && ho.sizes[k], { 2: 'Doubles', 3: 'Trebles', 4: 'Four-folds', 5: 'Five-folds' }[k])).join('<br>')}
+        <div class="muted-t">Legs: won ${pct(ho.legs.hit, 1)} vs stated ${pct(ho.legs.stated, 1)}. Same rule on the 2019-23 seasons: ${rec.tuning && rec.tuning.sizes && rec.tuning.sizes['3'] ? `trebles won ${pct(rec.tuning.sizes['3'].hit, 1)} (stated ${pct(rec.tuning.sizes['3'].stated, 1)})` : '—'}. The combined probability is reliable; profit is not — margins multiply, so only take an accumulator at or above its take-at price.</div></div>` : ''}
+    </div>
+    ${a.error ? `<div class="err-box">${esc(a.error)}</div>` : ''}
+    ${a.options && a.options.length ? `<div class="acca-opts">${a.options.map((op) => `<div class="acca ${op.recommended ? 'rec' : ''}">
+        <div class="acca-h"><b>${esc(op.name)}</b>${op.recommended ? ' <span class="badge st-lock">Recommended</span>' : ''}<span class="acca-p">${pct(op.prob, 1)}</span></div>
+        <div class="acca-o">Fair odds <b>${dec(op.fairOdds)}</b> · take at <b>${dec(op.takeAt)}</b>${op.bestOdds ? ` · best available <b>${dec(op.bestOdds)}</b>${op.value != null ? ` (<span class="${op.value >= 0 ? 'pos' : 'neg'}">${signed(op.value * 100, 1)}%</span>)` : ''}` : ' · not every leg has a price'}</div>
+        ${op.measured ? `<div class="acca-m">In testing: won ${pct(op.measured.hit, 1)} (stated ${pct(op.measured.stated, 1)}, ${op.measured.n} days)</div>` : ''}
+        <div class="acca-legs">${op.legs.map((l) => `<div><span>${esc(l.home)} v ${esc(l.away)}</span><b>${esc(l.label)}</b><em>${pct(l.prob, 0)}</em></div>`).join('')}</div>
+      </div>`).join('')}</div>` : `<div class="empty"><h3>No accumulator today</h3><p>${(a.legs || []).length ? 'Only one double-confirmed leg — an accumulator needs at least two.' : 'No selection on this date passes both a methodology and the normal prediction.'} That is the filter working: legs are only added when both layers agree.</p></div>`}
+    ${(a.legs || []).length ? `<div class="sec-title" style="margin-top:16px">All double-confirmed legs <span class="pill">${a.legs.length}</span></div><div class="acca-all">${a.legs.map(legRow).join('')}</div>` : ''}`;
+  $$('.al', el).forEach((c) => c.addEventListener('click', () => openMatch(c.dataset.id, c.dataset.league, '')));
+}
+
+async function researchBlock() {
+  try {
+    if (!state.research) state.research = await api('/api/intel-research');
+  } catch {
+    return '';
+  }
+  const r = state.research;
+  const rec = r.record && r.record.heldOut;
+  const imp = r.importance || {};
+  const fam = (o) => Object.entries(o || {}).filter(([k]) => k !== 'calendar').map(([k, v]) => `<div class="en-row"><span>${esc(FAMILY_NAMES[k] || k)}</span><span class="en-bar"><span style="width:${Math.round(v * 250)}%"></span></span><span class="num">${pct(v, 0)}</span></div>`).join('');
+  const counts = {};
+  for (const x of Object.values((r.patterns && r.patterns.rules) || {})) counts[x.status] = (counts[x.status] || 0) + 1;
+  return `<div class="m-intro"><h2>v6 — the normal prediction, rebuilt</h2>
+      <p>Every fixture is measured on <b>170 factors</b> in eleven families (form and trend, goal trends, shots and luck, results against the bookmakers'
+      expectation, Elo momentum, head-to-head, table and motivation, schedule, discipline, league, market). The crawler collects them from free sources
+      (football-data.co.uk match statistics and odds, ClubElo history, ESPN, Open-Meteo) and the model was trained on <b>134,579</b> matches (2005-19),
+      tuned on 2019-23 and tested on <b>29,191</b> held-out matches (2023-26).</p>
+      ${rec ? `<div class="bt-hero">
+        <div><div class="v">${pct(rec.main.hit, 1)}</div><div class="k">Main pick hit rate (held-out)<br>stated ${pct(rec.main.stated, 1)} · ${rec.main.n.toLocaleString()} matches</div></div>
+        <div><div class="v">${signed(rec.value.roiBest * 100, 1)}%</div><div class="k">Value picks at the best price<br>${rec.value.n.toLocaleString()} bets · Bet365 ${signed(rec.value.roiBet365 * 100, 1)}%</div></div>
+        <div><div class="v">${pct(rec.avoid.won, 1)}</div><div class="k">"Avoid" selections won<br>vs ${pct(rec.avoid.marketSaid, 1)} the price implied</div></div>
+        <div><div class="v">${counts.trap || 0} + ${counts.edge || 0}</div><div class="k">confirmed traps + edges<br>of ${Object.values(counts).reduce((x, y) => x + y, 0)} popular patterns tested</div></div>
+      </div>` : ''}
+      <div class="two">
+        <div><div class="tr-h">What moves the forecast away from the price</div>${fam(imp.withMarket)}</div>
+        <div><div class="tr-h">What predicts the result with no price</div>${fam(imp.factorsOnly)}</div>
+      </div>
+      <p class="muted-t">The bookmakers' price already contains most of what these factors know: with a price, the factors improve the forecast by a small,
+      measurable amount (log-loss −0.03% to −0.32% depending on the market). Without a price they recover about 84% of what the price knows. The real gains are
+      in what the site now <b>shows</b> you, the traps it keeps you out of, and the value it finds when a bookmaker's price beats the fair price.</p>
+    </div>`;
+}
+const FAMILY_NAMES = { market: 'Market & price', form: 'Form & trend', goals: 'Goal trends', performance: 'Performance & luck', vsMarket: 'Beating the bookmakers', strength: 'Strength & momentum', h2h: 'Head-to-head', table: 'Table & motivation', schedule: 'Schedule & fatigue', discipline: 'Discipline & set pieces', league: 'League environment', calendar: 'Calendar' };
 
 /* ---------------------------------------------------------- track record view */
 
@@ -1063,6 +1239,7 @@ function renderPredView() {
   if (state.view === 'predictions') renderPredictions();
   else if (state.view === 'top') renderTop();
   else if (state.view === 'general') renderGeneral();
+  else if (state.view === 'acca') renderAcca();
 }
 
 async function refresh() {

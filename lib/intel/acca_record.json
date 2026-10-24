@@ -1,0 +1,268 @@
+{
+ "generated": "2026-10-24",
+ "rule": "Leg = methodology LOCK/PREDICT AND the normal prediction agrees (main pick, a safer form of it, or its result/goals/BTTS call at 60%+), never flagged as overrated. One leg per match; each day's most likely k legs.",
+ "heldOut": {
+  "window": [
+   "2023-07-01",
+   "2099-01-01"
+  ],
+  "legs": {
+   "n": 6785,
+   "hit": 0.724686809137804,
+   "stated": 0.7211965806927025
+  },
+  "mainAgreement": {
+   "n": 2053,
+   "hit": 0.725767169995129,
+   "stated": 0.7239786653677562
+  },
+  "callAgreement": {
+   "n": 7539,
+   "hit": 0.7168059424326834,
+   "stated": 0.7085139806340364
+  },
+  "saferAgreement": {
+   "n": 214,
+   "hit": 0.8457943925233645,
+   "stated": 0.7940242990654209
+  },
+  "methodologyOnly": {
+   "n": 13807,
+   "hit": 0.7053668429057725,
+   "stated": 0.6983072399074656
+  },
+  "rejectedByNormal": {
+   "n": 4001,
+   "hit": 0.6658335416145964,
+   "stated": 0.6639951468262948
+  },
+  "daysWithLegs": 711,
+  "sizes": {
+   "2": {
+    "n": 596,
+    "hit": 0.6728,
+    "stated": 0.6374,
+    "roiBet365": 0.0211,
+    "nPricedBet365": 270,
+    "roiBest": 0.0819,
+    "nPricedBest": 270
+   },
+   "3": {
+    "n": 526,
+    "hit": 0.5152,
+    "stated": 0.4966,
+    "roiBet365": -0.0127,
+    "nPricedBet365": 159,
+    "roiBest": 0.0798,
+    "nPricedBest": 159
+   },
+   "4": {
+    "n": 459,
+    "hit": 0.3922,
+    "stated": 0.3842,
+    "roiBet365": -0.1051,
+    "nPricedBet365": 82,
+    "roiBest": 0.0035,
+    "nPricedBest": 82
+   },
+   "5": {
+    "n": 389,
+    "hit": 0.3033,
+    "stated": 0.302,
+    "roiBet365": -0.3475,
+    "nPricedBet365": 49,
+    "roiBest": -0.2607,
+    "nPricedBest": 49
+   }
+  },
+  "methodologyOnlyAccas": {
+   "2": {
+    "n": 650,
+    "hit": 0.6615384615384615,
+    "stated": 0.6359349557814976,
+    "roiBet365": -0.0011713057026365192,
+    "nPricedBet365": 217,
+    "roiBest": 0.05578127631805797,
+    "nPricedBest": 217
+   },
+   "3": {
+    "n": 584,
+    "hit": 0.5205479452054794,
+    "stated": 0.4963651015141909,
+    "roiBet365": -0.10186683408302191,
+    "nPricedBet365": 97,
+    "roiBest": -0.025043017714913712,
+    "nPricedBest": 97
+   },
+   "4": {
+    "n": 523,
+    "hit": 0.3862332695984704,
+    "stated": 0.3842276442882134,
+    "roiBet365": -0.23047346972887786,
+    "nPricedBet365": 37,
+    "roiBest": -0.15323632435840145,
+    "nPricedBest": 37
+   },
+   "5": {
+    "n": 470,
+    "hit": 0.3148936170212766,
+    "stated": 0.29519166795514695,
+    "roiBet365": -0.49026838066399486,
+    "nPricedBet365": 13,
+    "roiBest": -0.43466934194301987,
+    "nPricedBest": 13
+   }
+  }
+ },
+ "tuning": {
+  "window": [
+   "2019-07-01",
+   "2023-06-30"
+  ],
+  "legs": {
+   "n": 9431,
+   "hit": 0.7308874986745838,
+   "stated": 0.7266165411939365
+  },
+  "mainAgreement": {
+   "n": 2815,
+   "hit": 0.7399644760213144,
+   "stated": 0.7307165186500891
+  },
+  "callAgreement": {
+   "n": 9849,
+   "hit": 0.7090059904558839,
+   "stated": 0.7120801502690635
+  },
+  "saferAgreement": {
+   "n": 338,
+   "hit": 0.8254437869822485,
+   "stated": 0.7944745562130178
+  },
+  "methodologyOnly": {
+   "n": 19023,
+   "hit": 0.7007306944225411,
+   "stated": 0.7003147169782097
+  },
+  "rejectedByNormal": {
+   "n": 6021,
+   "hit": 0.6618501909981731,
+   "stated": 0.6655433540269423
+  },
+  "daysWithLegs": 972,
+  "sizes": {
+   "2": {
+    "n": 837,
+    "hit": 0.6464,
+    "stated": 0.6414,
+    "roiBet365": -0.0067,
+    "nPricedBet365": 278,
+    "roiBest": 0.0609,
+    "nPricedBest": 278
+   },
+   "3": {
+    "n": 722,
+    "hit": 0.4861,
+    "stated": 0.5058,
+    "roiBet365": -0.1065,
+    "nPricedBet365": 145,
+    "roiBest": -0.0135,
+    "nPricedBest": 145
+   },
+   "4": {
+    "n": 642,
+    "hit": 0.3801,
+    "stated": 0.3953,
+    "roiBet365": -0.0533,
+    "nPricedBet365": 84,
+    "roiBest": 0.0718,
+    "nPricedBest": 84
+   },
+   "5": {
+    "n": 560,
+    "hit": 0.3161,
+    "stated": 0.3104,
+    "roiBet365": -0.0776,
+    "nPricedBet365": 45,
+    "roiBest": 0.072,
+    "nPricedBest": 45
+   }
+  },
+  "methodologyOnlyAccas": {
+   "2": {
+    "n": 887,
+    "hit": 0.649379932356257,
+    "stated": 0.639580303221811,
+    "roiBet365": 0.012068010964090298,
+    "nPricedBet365": 229,
+    "roiBest": 0.07949152232815915,
+    "nPricedBest": 229
+   },
+   "3": {
+    "n": 807,
+    "hit": 0.5080545229244114,
+    "stated": 0.49941304015154153,
+    "roiBet365": -0.018846126644849068,
+    "nPricedBet365": 103,
+    "roiBest": 0.07835170308443419,
+    "nPricedBest": 103
+   },
+   "4": {
+    "n": 730,
+    "hit": 0.3863013698630137,
+    "stated": 0.38852095295999894,
+    "roiBet365": 0.1455428172737708,
+    "nPricedBet365": 47,
+    "roiBest": 0.2936183199531939,
+    "nPricedBest": 47
+   },
+   "5": {
+    "n": 663,
+    "hit": 0.2850678733031674,
+    "stated": 0.30203866314446454,
+    "roiBet365": 0.557494788639691,
+    "nPricedBet365": 23,
+    "roiBest": 0.8456542443308793,
+    "nPricedBest": 23
+   }
+  }
+ },
+ "sizes": {
+  "2": {
+   "n": 596,
+   "hit": 0.6728,
+   "stated": 0.6374,
+   "roiBet365": 0.0211,
+   "nPricedBet365": 270,
+   "roiBest": 0.0819,
+   "nPricedBest": 270
+  },
+  "3": {
+   "n": 526,
+   "hit": 0.5152,
+   "stated": 0.4966,
+   "roiBet365": -0.0127,
+   "nPricedBet365": 159,
+   "roiBest": 0.0798,
+   "nPricedBest": 159
+  },
+  "4": {
+   "n": 459,
+   "hit": 0.3922,
+   "stated": 0.3842,
+   "roiBet365": -0.1051,
+   "nPricedBet365": 82,
+   "roiBest": 0.0035,
+   "nPricedBest": 82
+  },
+  "5": {
+   "n": 389,
+   "hit": 0.3033,
+   "stated": 0.302,
+   "roiBet365": -0.3475,
+   "nPricedBet365": 49,
+   "roiBest": -0.2607,
+   "nPricedBest": 49
+  }
+ }
+}
