@@ -1244,6 +1244,7 @@ function renderPredView() {
 
 async function refresh() {
   if (state.view === 'matches') return loadBoard();
+  if (state.view === 'strongest') return window.renderStrongest && window.renderStrongest(true);
   if (state.view === 'method') return renderMethod();
   if (state.view === 'record') return renderRecord();
   try {
@@ -1264,6 +1265,7 @@ function setView(view) {
   if (view === 'matches') { loadBoard(); return; }
   if (view === 'method') { renderMethod(); return; }
   if (view === 'record') { renderRecord(); return; }
+  if (view === 'strongest') { if (window.renderStrongest) window.renderStrongest(); return; }
 
   renderPredView(); // shows the loading block until data arrives
   loadPredictions(false)

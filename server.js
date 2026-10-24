@@ -20,6 +20,9 @@
  *   GET /api/accumulator?date=        -> v6 double-confirmed accumulator (methodology + normal prediction agree)
  *   GET /api/crawler                  -> v6 crawler status: per-source requests, cache hits, robots, pauses
  *   GET /api/intel-research           -> v6 research record: factor importance, patterns, decision backtest
+ *   GET /api/strongest?date=          -> Strongest Picks: nine SportyBet market groups per match, one pick per
+ *                                        match when every independent view agrees (no fixed number of picks)
+ *   GET /api/strongest/record[?format=csv] -> the Strongest Picks track record
  */
 
 const http = require('http');
@@ -37,6 +40,7 @@ const BACKTEST = require('./lib/backtest.json');
 const ACC = require('./lib/intel/accumulator');
 const HTTPC = require('./lib/crawler/http');
 const WH = require('./lib/crawler/warehouse');
+const STR = require('./lib/strongest');
 
 const readJson = (f) => {
   try {
@@ -360,6 +364,49 @@ function briefFull(m) {
   };
 }
 
+/**
+ * Strongest Picks for a day (lib/strongest). Built on the same day analysis as the
+ * predictions (shared caches), cached for a few minutes, recorded before kick-off.
+ */
+const strongestCache = new Map();
+const strongestInflight = new Map();
+async function strongestDay(dateYmd, limit) {
+  const key = `${dateYmd}|${limit}`;
+  const hit = strongestCache.get(key);
+  if (hit && Date.now() - hit.at < STR.CFG.dayCacheMinutes * 60 * 1000) return hit.value;
+  // two visitors opening the tab at once share one build
+  if (strongestInflight.has(key)) return strongestInflight.get(key);
+  const p = (async () => {
+    const { reports } = await analyseDay(dateYmd, limit);
+    const day = await STR.forReports(reports, { day: isoFromYmd(dateYmd) });
+    try {
+      STR.record.record(day);
+    } catch {
+      /* the record is best-effort and must never break the page */
+    }
+    strongestCache.set(key, { at: Date.now(), value: day });
+    if (strongestCache.size > 20) strongestCache.delete(strongestCache.keys().next().value);
+    return day;
+  })().finally(() => strongestInflight.delete(key));
+  strongestInflight.set(key, p);
+  return p;
+}
+async function buildStrongest(dateYmd, limit) {
+  const day = await strongestDay(dateYmd, limit);
+  // settle finished picks in the background (throttled inside)
+  STR.record.settleAll().catch(() => 0);
+  const now = Date.now();
+  return {
+    ...day,
+    config: STR.publicConfig(),
+    record: STR.record.summary(),
+    earlier: STR.record.forDate(isoFromYmd(dateYmd)).filter((e) => Date.parse(e.date) <= now).map((e) => ({
+      fixture: e.fixture, date: e.date, league: e.leagueName || e.league, home: e.home, away: e.away, group: e.group, label: e.label,
+      prob: e.prob, floor: e.floor, tier: e.tier, result: e.result, hit: e.hit, ht: e.ht || null,
+    })),
+  };
+}
+
 // Settling the ledger touches ESPN once per league-day; do it at most every 10 minutes.
 let lastSettle = 0;
 async function settleLedger() {
@@ -505,6 +552,21 @@ const server = http.createServer(async (req, res) => {
         importance: readJson('./lib/intel/importance.json'),
         patterns: readJson('./lib/intel/rules.json'),
       });
+    }
+
+    if (p === '/api/strongest') {
+      const dateYmd = normaliseDate(url.searchParams.get('date'));
+      const limit = Number(url.searchParams.get('limit')) || 60;
+      return json(res, 200, await buildStrongest(dateYmd, limit));
+    }
+
+    if (p === '/api/strongest/record') {
+      await STR.record.settleAll().catch(() => 0);
+      if (url.searchParams.get('format') === 'csv') {
+        res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="strongest-picks-record.csv"' });
+        return res.end(STR.record.toCsv());
+      }
+      return json(res, 200, STR.record.summary());
     }
 
     if (p === '/api/bankers') {
