@@ -1,5 +1,8 @@
 'use strict';
 
+// the browser's day database (public/daycache.js); the site still works from the server without it
+if (!window.DayCache) window.DayCache = { init: async () => null, onNewDay() {}, getPayload: async () => null, putPayload: async () => null, getReport: async () => null, putReport: async () => null, available: () => false, day: () => null };
+
 /* ============================================================
    Sharpshooter — front-end
    Vanilla JS. No frameworks, no CDN, no build step.
@@ -87,7 +90,7 @@ function renderBoard() {
   const board = state.board;
   const el = $('#board');
 
-  if (!board) return;
+  if (!board || state.view !== 'matches') return;
   if (!board.leagues.length) {
     el.innerHTML = `<div class="empty"><h3>No fixtures found</h3>
       <p>Nothing scheduled in the tracked competitions on ${esc(fmtDateLong(state.date))}.</p></div>`;
@@ -99,8 +102,12 @@ function renderBoard() {
     for (const b of state.preds.headline) bankerMap.set(String(b.match.id), b);
   }
   const genMap = new Map(); // fixture id -> general prediction
+  const outMap = new Map(); // fixture id -> its result against the prediction (started matches)
   if (state.preds && state.preds.general) {
-    for (const g of state.preds.general) genMap.set(String(g.match.id), g.general);
+    for (const g of state.preds.general) {
+      genMap.set(String(g.match.id), g.general);
+      if (g.outcome) outMap.set(String(g.match.id), g.outcome);
+    }
   }
 
   let html = '';
@@ -147,10 +154,14 @@ function renderBoard() {
       const gp = genMap.get(String(m.id));
       const scoreChip = gp && !isPost && !isLive
         ? `<span class="sc-chip" title="Predicted final score · ${esc(gp.result.label)} ${pct(gp.result.prob, 0)}">${gp.score.predicted.home}–${gp.score.predicted.away}</span>` : '';
-      if (isLive) badge = `<span class="badge live">live</span>`;
+      const oc = outMap.get(String(m.id));
+      const resChip = gp && gp.bestBet && (isPost || isLive)
+        ? `<span class="res-chip" title="Main pick, predicted before kick-off">${esc(gp.bestBet.label)} ${mark(oc ? oc.main : null, isPost)}</span>` : '';
+      if (isLive && !bk) badge = `<span class="badge live">live</span>`;
       else if (bk) {
         const sm = statusMeta(bk.prediction.status);
-        badge = `<span class="badge st-${sm.cls}" title="${esc(bk.prediction.name)}">${esc(bk.prediction.pick.label)}</span>`;
+        const bo = bk.outcome;
+        badge = `<span class="badge st-${sm.cls}" title="${esc(bk.prediction.name)}">${esc(bk.prediction.pick.label)}${bo ? ' ' + mark(bo.hit, bo.final) : ''}</span>`;
       }
 
       html += `<div class="match-row ${state.selectedId === String(m.id) ? 'is-open' : ''}" data-id="${esc(m.id)}" data-league="${esc(m.league)}" data-year="${esc(m.seasonYear || '')}">
@@ -168,7 +179,7 @@ function renderBoard() {
           </div>
         </div>
         <div class="mr-right">
-          <div class="mr-badges">${scoreChip}${badge}</div>
+          <div class="mr-badges">${scoreChip}${resChip}${badge}</div>
           ${oddsHtml}
         </div>
       </div>`;
@@ -206,6 +217,23 @@ async function openMatch(id, league, year) {
     <p style="font-size:11px;max-width:280px;text-align:center;color:var(--text-3)">
       Fetching xG/xGA, form, head-to-head, line movement and running the Dixon-Coles model.</p></div>`;
 
+  // this browser's saved copy of the report: shown at once
+  const saved = await DayCache.getReport(league, id);
+  if (saved && state.selectedId === String(id)) {
+    state.analysis = saved;
+    renderDetail(saved);
+  }
+  const fx = liveFixture(id);
+  const started = fx ? fx.state !== 'pre' : !!(saved && saved.match && saved.match.state !== 'pre');
+  const savedPre = !!(saved && !saved.lateAnalysis);
+  const ageMin = saved && saved.savedInBrowserAt ? (Date.now() - Date.parse(saved.savedInBrowserAt)) / 60000 : Infinity;
+  // a played match keeps its pre-match report; a match still to play is re-checked after 10 minutes
+  if (saved && ((started && savedPre) || (!started && ageMin < 10))) {
+    state.loadingDetail = false;
+    setStatus(started ? 'prediction saved before kick-off' : 'analysis ready (saved copy)', 'ok');
+    return;
+  }
+
   try {
     // The date must be sent: the server rebuilds the fixture from that day's
     // scoreboard, so omitting it makes every non-today fixture unresolvable.
@@ -213,15 +241,66 @@ async function openMatch(id, league, year) {
       `&date=${encodeURIComponent(state.date)}` +
       (year ? `&year=${encodeURIComponent(year)}` : '');
     const rep = await api(url);
-    state.analysis = rep;
-    renderDetail(rep);
+    if (state.selectedId !== String(id)) return;
+    let show = rep;
+    if (rep.lateAnalysis && savedPre) {
+      // the server only has an after-kick-off analysis: keep the prediction saved before kick-off
+      show = { ...saved, match: { ...saved.match, state: rep.match.state, clock: rep.match.clock, statusDetail: rep.match.statusDetail, home: { ...saved.match.home, score: rep.match.home.score }, away: { ...saved.match.away, score: rep.match.away.score } } };
+    } else if (!rep.lateAnalysis) {
+      DayCache.putReport(league, id, rep);
+    }
+    state.analysis = show;
+    renderDetail(show);
     setStatus('analysis ready', 'ok');
   } catch (err) {
-    $('#detailInner').innerHTML = `<div class="err-box"><strong>Analysis failed</strong><br>${esc(err.message)}</div>`;
-    setStatus('analysis error', 'err');
+    if (saved && state.selectedId === String(id)) {
+      setStatus('offline — showing the analysis saved on this device', 'err');
+    } else {
+      $('#detailInner').innerHTML = `<div class="err-box"><strong>Analysis failed</strong><br>${esc(err.message)}</div>`;
+      setStatus('analysis error', 'err');
+    }
   } finally {
     state.loadingDetail = false;
   }
+}
+
+/** A report's match with the freshest live state and score the page knows. */
+function overlayMatch(m) {
+  const f = liveFixture(m.id);
+  if (!f) return m;
+  const rank = { pre: 0, in: 1, post: 2 };
+  if ((rank[f.state] || 0) < (rank[m.state] || 0)) return m;
+  return {
+    ...m, state: f.state, completed: f.completed, statusDetail: f.statusDetail || m.statusDetail, clock: f.clock,
+    home: { ...m.home, score: f.home ? f.home.score : m.home.score }, away: { ...m.away, score: f.away ? f.away.score : m.away.score },
+  };
+}
+
+/** Full-time / live banner: every pick made before kick-off, ticked or crossed. */
+function resultBanner(rep, m) {
+  if (!m.state || m.state === 'pre') return '';
+  const final = m.state === 'post';
+  const g = rep.general && !rep.general.error ? rep.general : null;
+  const h = rep.methodology && rep.methodology.headline;
+  const og = g ? SS.outcomeGeneral(g, m) : null;
+  const oh = h && h.pick ? SS.outcomeOf(h.pick.key, m) : null;
+  const items = [];
+  if (og && g.bestBet) items.push(`Main pick <b>${esc(g.bestBet.label)}</b> ${mark(og.main, final)}`);
+  const vp = g && (g.alternatives || []).find((a) => a.role === 'value');
+  if (og && vp) items.push(`Value pick <b>${esc(vp.label)}</b> ${mark(og.value, final)}`);
+  if (oh) items.push(`${esc(h.name)} <b>${esc(h.pick.label)}</b> ${mark(oh.hit, final)}`);
+  if (og) {
+    items.push(`Result ${mark(og.result, final)}`);
+    items.push(`Goals ${esc(g.goals.call)} 2.5 ${mark(og.goals, final)}`);
+    items.push(`BTTS ${esc(g.btts.call)} ${mark(og.btts, final)}`);
+    items.push(`Score ${esc(g.score.predicted.score)} ${mark(og.exact, final)}`);
+  }
+  const note = rep.lateAnalysis
+    ? '<div class="rb-note">No prediction was saved before kick-off for this match (the site was not open, or the server was asleep). The numbers below were worked out after the start.</div>'
+    : '<div class="rb-note">Prediction made before kick-off and kept unchanged.</div>';
+  return `<div class="res-banner ${final ? 'ft' : 'live'}">
+    <div class="rb-h">${final ? 'Full time' : 'Live ' + esc(m.clock || '')} · <b>${esc(m.home.name)} ${m.home.score ?? ''} – ${m.away.score ?? ''} ${esc(m.away.name)}</b></div>
+    <div class="rb-items">${items.map((x) => `<span>${x}</span>`).join('')}</div>${note}</div>`;
 }
 
 function closeDetail() {
@@ -239,7 +318,7 @@ function scoreClass(s) {
 }
 
 function renderDetail(rep) {
-  const m = rep.match;
+  const m = overlayMatch(rep.match);
   const el = $('#detailInner');
 
   const head = `
@@ -260,7 +339,7 @@ function renderDetail(rep) {
         </div>
       </div>
       <div class="d-meta">${esc(fmtDateLong(m.date.slice(0, 10)))} · ${esc(fmtTime(m.date))}${m.venue ? ' · ' + esc(m.venue) : ''}</div>
-    </div>`;
+    </div>` + resultBanner(rep, m);
 
   if (!rep.analysable) {
     el.innerHTML = head + `<div class="no-banker"><strong>No prediction issued</strong> ${esc(rep.reason || '')}</div>`
@@ -777,7 +856,8 @@ function predCard(item, withMethod) {
       <span class="pc-score" title="Methodology score, 0–100">${p.score}</span>
     </div>
     <div class="pc-match">${esc(m.home.name)} <span>vs</span> ${esc(m.away.name)}</div>
-    <div class="pc-pick">${esc(p.pick.label)}</div>
+    <div class="pc-pick">${esc(p.pick.label)} ${item.outcome ? mark(item.outcome.hit, item.outcome.final) : ''}</div>
+    ${item.outcome ? `<div class="pc-res">${scoreTag(m)}</div>` : ''}
     ${withMethod ? `<div class="pc-method">${esc(p.name)} · v${esc(p.version)}</div>` : ''}
     <div class="pc-stats">
       <span>Prob <b>${pct(p.prob, 0)}</b></span>
@@ -888,12 +968,95 @@ function methodologySection(rep) {
 
 /* ---------------------------------------------------------- predictions view */
 
+/* ---------------------------------------------------------- the day database
+   Predictions show at once from this browser's copy of the day (public/daycache.js),
+   then a fresh copy is fetched and MERGED (public/shared.js): a match that has kicked off
+   keeps the prediction made before kick-off and gets its live / final score and a tick
+   or cross; matches still to play take the newest prediction. Wiped at 05:00 Ghana time. */
+const DAY = { inflight: new Map(), pollTimer: null, polls: 0 };
+
+function hhmm(iso) {
+  return iso ? new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+}
+
+function predStatus(d) {
+  const s = d.summary || {};
+  const mp = s.main || {};
+  const done = (mp.won || 0) + (mp.lost || 0);
+  return `${(d.general || []).length} fixtures predicted · ${d.predicted} methodology picks`
+    + (done ? ` · main picks ${mp.won} ✓ ${mp.lost} ✕` : '')
+    + (d.cache && d.cache.refreshing ? ' · updating…' : '');
+}
+
+function rerenderViews() {
+  if (state.view === 'matches') renderBoard();
+  else if (['predictions', 'top', 'general', 'acca'].includes(state.view)) renderPredView();
+}
+
 async function loadPredictions(force) {
-  if (state.preds && !force && state.preds.date === state.date) return state.preds;
+  const date = state.date;
+  if (state.preds && !force && state.preds.date === date) return state.preds;
+  if (!force && (!state.preds || state.preds.date !== date)) {
+    const saved = await DayCache.getPayload('predictions', date);
+    if (saved && state.date === date) {
+      // instant: this browser's saved copy, then quietly bring it up to date
+      state.preds = SS.attachResults(saved);
+      setStatus(`saved copy from ${hhmm(saved.cache && saved.cache.savedAt) || 'earlier today'} · updating…`, 'busy');
+      fetchPredictions(date, false).then((d) => { if (d) rerenderViews(); }).catch(() => setStatus('offline — showing the predictions saved on this device', 'err'));
+      return state.preds;
+    }
+  }
   setStatus('analysing the day…', 'busy');
-  state.preds = await api(`/api/predictions?date=${encodeURIComponent(state.date)}&limit=60`);
-  setStatus(`${(state.preds.general || []).length} fixtures predicted · ${state.preds.predicted} methodology picks`, 'ok');
+  await fetchPredictions(date, force);
   return state.preds;
+}
+
+function fetchPredictions(date, force) {
+  const key = `${date}|${force ? 1 : 0}`;
+  if (DAY.inflight.has(key)) return DAY.inflight.get(key);
+  const p = (async () => {
+    const fresh = await api(`/api/predictions?date=${encodeURIComponent(date)}&limit=60${force ? '&refresh=1' : ''}`);
+    if (state.date !== date) return null;
+    const older = state.preds && state.preds.date === date ? state.preds : await DayCache.getPayload('predictions', date);
+    const merged = SS.mergePredictions(older, fresh);
+    merged.cache = fresh.cache || null;
+    state.preds = merged;
+    DayCache.putPayload('predictions', date, merged);
+    setStatus(predStatus(merged), merged.cache && merged.cache.refreshing ? 'busy' : 'ok');
+    // the server answered from its own day book and is rebuilding the day: ask again shortly
+    clearTimeout(DAY.pollTimer);
+    if (merged.cache && merged.cache.refreshing && DAY.polls < 8) {
+      DAY.polls++;
+      DAY.pollTimer = setTimeout(() => {
+        if (state.date === date) fetchPredictions(date, false).then((d) => { if (d) rerenderViews(); }).catch(() => {});
+      }, 20000);
+    } else DAY.polls = 0;
+    return merged;
+  })().finally(() => DAY.inflight.delete(key));
+  DAY.inflight.set(key, p);
+  return p;
+}
+
+/** Live state and score of a fixture, from the freshest copy the page has. */
+function liveFixture(id) {
+  const f = state.preds && (state.preds.fixtures || []).find((x) => String(x.id) === String(id));
+  if (f) return f;
+  const b = state.board && state.board.leagues.flatMap((lg) => lg.matches).find((m) => String(m.id) === String(id));
+  return b ? SS.fixturesFrom([b])[0] : null;
+}
+
+/** ✓ / ✕ / live mark for a settled (or running) outcome. */
+function mark(hit, final) {
+  if (hit == null) return final ? '<span class="rm void" title="void">–</span>' : '';
+  if (!final) return `<span class="rm ${hit ? 'on' : 'off'}" title="${hit ? 'on course' : 'not yet'}">${hit ? '↗' : '↘'}</span>`;
+  return `<span class="rm ${hit ? 'won' : 'lost'}">${hit ? '✓' : '✕'}</span>`;
+}
+
+/** "FT 2-1" / "LIVE 63' 1-0" label for a started match. */
+function scoreTag(m) {
+  if (!m || !m.state || m.state === 'pre') return '';
+  const sc = m.home && m.home.score != null ? `${m.home.score}-${m.away.score}` : '';
+  return m.state === 'post' ? `<span class="ft-tag">FT ${esc(sc)}</span>` : `<span class="live-tag">LIVE ${esc(m.clock || '')} ${esc(sc)}</span>`;
 }
 
 function summaryStrip(d) {
@@ -975,7 +1138,8 @@ function renderTop() {
       <div class="th-kicker">★ Top pick · ${esc(sm.label)} · ${esc(p.tier)}</div>
       <div class="th-match">${esc(m.home.name)} vs ${esc(m.away.name)}</div>
       <div class="th-league">${esc(m.leagueFlag || '')} ${esc(m.leagueName)} · ${esc(fmtTime(m.date))} · ${esc(fmtDateLong(m.date.slice(0, 10)))}</div>
-      <div class="th-pick"><span>${esc(p.pick.label)}</span><em>${esc(p.name)}</em></div>
+      <div class="th-pick"><span>${esc(p.pick.label)} ${best.outcome ? mark(best.outcome.hit, best.outcome.final) : ''}</span><em>${esc(p.name)}</em></div>
+      ${best.outcome ? `<div class="th-res">${scoreTag(m)}</div>` : ''}
       <div class="th-grid">
         <div><div class="v">${p.score}</div><div class="k">Score</div></div>
         <div><div class="v">${pct(p.prob)}</div><div class="k">Probability</div></div>
@@ -1068,7 +1232,7 @@ function renderGeneral() {
   const list = (d.general || []).filter((x) => state.filter.conf === 'all' || x.general.confidence.level === state.filter.conf);
   const counts = { High: 0, Medium: 0, Low: 0 };
   for (const x of d.general || []) counts[x.general.confidence.level]++;
-  let html = `<div class="filters">
+  let html = todayStrip(d) + `<div class="filters">
     ${['all', 'High', 'Medium', 'Low'].map((c) => `<button class="fchip ${state.filter.conf === c ? 'is-active' : ''}" data-c="${c}">${c === 'all' ? 'All fixtures' : c + ' confidence'} <b>${c === 'all' ? (d.general || []).length : counts[c]}</b></button>`).join('')}
   </div>`;
   if (!list.length) {
@@ -1078,17 +1242,20 @@ function renderGeneral() {
       const g = x.general;
       const m = x.match;
       const bb = g.bestBet;
-      return `<div class="gcard" data-id="${esc(m.id)}" data-league="${esc(m.league)}" data-year="${esc(m.seasonYear || '')}">
+      const o = x.outcome;
+      const fin = !!(o && o.final);
+      return `<div class="gcard ${o ? (fin ? 'is-done' : 'is-live') : ''}" data-id="${esc(m.id)}" data-league="${esc(m.league)}" data-year="${esc(m.seasonYear || '')}">
         <div class="pc-top"><span class="pc-league">${esc(m.leagueFlag || '')} ${esc(m.leagueName)} · ${esc(fmtTime(m.date))}</span>
+          ${o ? scoreTag(m) : ''}
           <span class="badge st-${CONF_CLS[g.confidence.level] || 'watch'}">${esc(g.confidence.level)}</span></div>
-        <div class="gc-match"><span>${esc(m.home.name)}</span><b>${g.score.predicted.home} – ${g.score.predicted.away}</b><span>${esc(m.away.name)}</span></div>
+        <div class="gc-match"><span>${esc(m.home.name)}</span><b title="Predicted score">${g.score.predicted.home} – ${g.score.predicted.away}${o ? ' ' + mark(o.exact, fin) : ''}</b><span>${esc(m.away.name)}</span></div>
         <div class="gc-calls">
-          <span>${esc(g.result.label)} <b>${pct(g.result.prob, 0)}</b></span>
-          <span>${esc(g.goals.call)} 2.5 <b>${pct(g.goals.prob, 0)}</b></span>
-          <span>BTTS ${esc(g.btts.call)} <b>${pct(g.btts.prob, 0)}</b></span>
+          <span>${esc(g.result.label)} <b>${pct(g.result.prob, 0)}</b>${o ? ' ' + mark(o.result, fin) : ''}</span>
+          <span>${esc(g.goals.call)} 2.5 <b>${pct(g.goals.prob, 0)}</b>${o ? ' ' + mark(o.goals, fin) : ''}</span>
+          <span>BTTS ${esc(g.btts.call)} <b>${pct(g.btts.prob, 0)}</b>${o ? ' ' + mark(o.btts, fin) : ''}</span>
         </div>
-        ${bb ? `<div class="gc-best"><span class="gc-k">${g.version === '6.0' ? 'Main pick' : g.source === 'methodology' ? esc(statusMeta(bb.status).label) + ' · ' + esc(bb.methodology) : 'Best bet'}</span>
-          <b>${esc(bb.label)}</b> ${pct(bb.prob, 0)} · take at ≥ ${dec(bb.valuePrice)}</div>` : ''}
+        ${bb ? `<div class="gc-best"><span class="gc-k">${g.version === '6.0' ? 'Main pick' : g.source === 'methodology' ? esc(statusMeta(bb.status).label) + ' · ' + esc(bb.methodology) : 'Best bet'}${o ? ' · predicted before kick-off' : ''}</span>
+          <b>${esc(bb.label)}</b> ${pct(bb.prob, 0)}${o ? ' ' + mark(o.main, fin) : ` · take at ≥ ${dec(bb.valuePrice)}`}</div>` : ''}
         ${g.version === '6.0' ? `<div class="gc-tags">${(g.alternatives || []).filter((a) => a.role === 'value').map((a) => `<span class="tag val" title="best ${dec(a.best)} vs fair ${dec(a.fairOdds)}">Value: ${esc(a.label)}</span>`).join('')}
           ${g.methodologyPick && g.methodologyPick.agrees ? `<span class="tag ok">✓ ${esc(g.methodologyPick.name)}</span>` : ''}
           ${(g.avoid || []).length ? `<span class="tag warn" title="${esc(g.avoid.map((a) => a.label).join(', '))}">Avoid ${g.avoid.length}</span>` : ''}</div>` : ''}
@@ -1098,6 +1265,23 @@ function renderGeneral() {
   }
   $$('.fchip', el).forEach((b) => b.addEventListener('click', () => { state.filter.conf = b.dataset.c; renderGeneral(); }));
   $$('.gcard', el).forEach((c) => c.addEventListener('click', () => openMatch(c.dataset.id, c.dataset.league, c.dataset.year)));
+}
+
+/** Today so far: finished / live / to play, and how the picks made before kick-off are doing. */
+function todayStrip(d) {
+  const s = d.summary;
+  if (!s || !(s.finished || s.live)) return '';
+  const wl = (t) => `${t.won} <span class="rm won">✓</span> ${t.lost} <span class="rm lost">✕</span>`;
+  return `<div class="today">
+    <div class="td-h">Today so far <small>${s.finished} finished · ${s.live} live · ${s.upcoming} to play${d.cache && d.cache.savedAt ? ` · saved on this device, resets 05:00 Ghana time` : ''}</small></div>
+    <div class="td-cells">
+      <div><b>${wl(s.main)}</b><span>Main picks</span></div>
+      ${s.value.won + s.value.lost ? `<div><b>${wl(s.value)}</b><span>Value picks</span></div>` : ''}
+      <div><b>${wl(s.methodology)}</b><span>Methodology picks</span></div>
+      <div><b>${wl(s.result)}</b><span>Result calls</span></div>
+      <div><b>${wl(s.goals)}</b><span>Over/Under 2.5</span></div>
+      <div><b>${s.exact.won}</b><span>Exact scores</span></div>
+    </div></div>`;
 }
 
 /* ---------------------------------------------------------- accumulator view (v6) */
@@ -1130,14 +1314,24 @@ function renderAcca() {
         <div class="muted-t">Legs: won ${pct(ho.legs.hit, 1)} vs stated ${pct(ho.legs.stated, 1)}. Same rule on the 2019-23 seasons: ${rec.tuning && rec.tuning.sizes && rec.tuning.sizes['3'] ? `trebles won ${pct(rec.tuning.sizes['3'].hit, 1)} (stated ${pct(rec.tuning.sizes['3'].stated, 1)})` : '—'}. The combined probability is reliable; profit is not — margins multiply, so only take an accumulator at or above its take-at price.</div></div>` : ''}
     </div>
     ${a.error ? `<div class="err-box">${esc(a.error)}</div>` : ''}
-    ${a.options && a.options.length ? `<div class="acca-opts">${a.options.map((op) => `<div class="acca ${op.recommended ? 'rec' : ''}">
-        <div class="acca-h"><b>${esc(op.name)}</b>${op.recommended ? ' <span class="badge st-lock">Recommended</span>' : ''}<span class="acca-p">${pct(op.prob, 1)}</span></div>
-        <div class="acca-o">Fair odds <b>${dec(op.fairOdds)}</b> · take at <b>${dec(op.takeAt)}</b>${op.bestOdds ? ` · best available <b>${dec(op.bestOdds)}</b>${op.value != null ? ` (<span class="${op.value >= 0 ? 'pos' : 'neg'}">${signed(op.value * 100, 1)}%</span>)` : ''}` : ' · not every leg has a price'}</div>
-        ${op.measured ? `<div class="acca-m">In testing: won ${pct(op.measured.hit, 1)} (stated ${pct(op.measured.stated, 1)}, ${op.measured.n} days)</div>` : ''}
-        <div class="acca-legs">${op.legs.map((l) => `<div><span>${esc(l.home)} v ${esc(l.away)}</span><b>${esc(l.label)}</b><em>${pct(l.prob, 0)}</em></div>`).join('')}</div>
-      </div>`).join('')}</div>` : `<div class="empty"><h3>No accumulator today</h3><p>${(a.legs || []).length ? 'Only one double-confirmed leg — an accumulator needs at least two.' : 'No selection on this date passes both a methodology and the normal prediction.'} That is the filter working: legs are only added when both layers agree.</p></div>`}
+    ${a.frozen ? `<div class="meas-note">These accumulators were published before their first kick-off and are kept unchanged; legs are ticked or crossed as results come in.</div>` : ''}
+    ${a.options && a.options.length ? accaCards(a.options) : `<div class="empty"><h3>No accumulator today</h3><p>${(a.legs || []).length ? 'Only one double-confirmed leg — an accumulator needs at least two.' : 'No selection on this date passes both a methodology and the normal prediction.'} That is the filter working: legs are only added when both layers agree.</p></div>`}
+    ${a.later && a.later.options && a.later.options.length ? `<div class="sec-title" style="margin-top:16px">For the matches still to play <span class="pill">newer</span></div>${accaCards(a.later.options)}` : ''}
     ${(a.legs || []).length ? `<div class="sec-title" style="margin-top:16px">All double-confirmed legs <span class="pill">${a.legs.length}</span></div><div class="acca-all">${a.legs.map(legRow).join('')}</div>` : ''}`;
   $$('.al', el).forEach((c) => c.addEventListener('click', () => openMatch(c.dataset.id, c.dataset.league, '')));
+}
+
+const ACCA_STATE = { won: ['Won', 'st-lock'], lost: ['Lost', 'lost'], live: ['In play', 'inplay'], void: ['Void', 'st-watch'], pending: ['To play', 'st-watch'] };
+function accaCards(options) {
+  return `<div class="acca-opts">${options.map((op) => {
+    const st = ACCA_STATE[op.outcome] || null;
+    return `<div class="acca ${op.recommended ? 'rec' : ''} ${op.outcome === 'won' ? 'is-won' : op.outcome === 'lost' ? 'is-lost' : ''}">
+      <div class="acca-h"><b>${esc(op.name)}</b>${op.recommended ? ' <span class="badge st-lock">Recommended</span>' : ''}${st && op.outcome !== 'pending' ? ` <span class="badge ${st[1]}">${st[0]}</span>` : ''}<span class="acca-p">${pct(op.prob, 1)}</span></div>
+      <div class="acca-o">Fair odds <b>${dec(op.fairOdds)}</b> · take at <b>${dec(op.takeAt)}</b>${op.bestOdds ? ` · best available <b>${dec(op.bestOdds)}</b>${op.value != null ? ` (<span class="${op.value >= 0 ? 'pos' : 'neg'}">${signed(op.value * 100, 1)}%</span>)` : ''}` : ' · not every leg has a price'}</div>
+      ${op.measured ? `<div class="acca-m">In testing: won ${pct(op.measured.hit, 1)} (stated ${pct(op.measured.stated, 1)}, ${op.measured.n} days)</div>` : ''}
+      <div class="acca-legs">${op.legs.map((l) => `<div><span>${esc(l.home)} v ${esc(l.away)}</span><b>${esc(l.label)}</b><em>${pct(l.prob, 0)}${l.outcome ? ' ' + mark(l.outcome.hit, l.outcome.final) : ''}</em></div>`).join('')}</div>
+    </div>`;
+  }).join('')}</div>`;
 }
 
 async function researchBlock() {
@@ -1217,19 +1411,50 @@ async function renderRecord() {
 /* ---------------------------------------------------------- orchestration */
 
 async function loadBoard() {
-  setStatus('loading fixtures…', 'busy');
+  const date = state.date;
+  if (!state.board || state.board.date !== date) {
+    const saved = await DayCache.getPayload('board', date);
+    if (saved && state.date === date && (!state.board || state.board.date !== date)) {
+      state.board = saved;
+      if (!state.preds || state.preds.date !== date) {
+        const sp = await DayCache.getPayload('predictions', date);
+        if (sp && state.date === date) state.preds = SS.attachResults(sp);
+      }
+      if (state.view === 'matches') renderBoard();
+    }
+  }
+  if (state.view === 'matches') setStatus('loading fixtures…', 'busy');
   try {
-    state.board = await api(`/api/matches?date=${encodeURIComponent(state.date)}`);
-    setStatus(`${state.board.totalMatches} fixtures · ${state.board.totalLeagues} competitions`, 'ok');
-    renderBoard();
+    const board = await api(`/api/matches?date=${encodeURIComponent(date)}`);
+    if (state.date !== date) return;
+    state.board = board;
+    DayCache.putPayload('board', date, board);
+    // live and final scores onto the saved predictions (ticks and crosses update as games finish)
+    if (state.preds && state.preds.date === date) {
+      const cache = state.preds.cache;
+      state.preds = SS.mergePredictions(state.preds, { ...state.preds, fixtures: SS.fixturesFrom(board.leagues.flatMap((lg) => lg.matches)) });
+      state.preds.cache = cache;
+      DayCache.putPayload('predictions', date, state.preds);
+    }
+    if (state.view === 'matches') {
+      setStatus(`${board.totalMatches} fixtures · ${board.totalLeagues} competitions`, 'ok');
+      renderBoard();
+    } else {
+      if (state.preds && state.preds.date === date) setStatus(predStatus(state.preds), 'ok');
+      rerenderViews();
+    }
     // Prediction badges need the day's deep analysis. Load it in the background
     // so the fixture list stays fast, then re-render once the badges are known.
-    if (!state.preds) {
+    if (!state.preds || state.preds.date !== date) {
       loadPredictions()
         .then(() => { if (state.view === 'matches') renderBoard(); })
         .catch(() => { /* badges are a progressive enhancement */ });
     }
   } catch (err) {
+    if (state.board && state.board.date === date) {
+      setStatus('offline — showing the fixtures saved on this device', 'err');
+      return;
+    }
     $('#board').innerHTML = `<div class="err-box"><strong>Could not load fixtures</strong><br>${esc(err.message)}</div>`;
     setStatus('error', 'err');
   }
@@ -1243,16 +1468,24 @@ function renderPredView() {
 }
 
 async function refresh() {
-  if (state.view === 'matches') return loadBoard();
   if (state.view === 'strongest') return window.renderStrongest && window.renderStrongest(true);
   if (state.view === 'method') return renderMethod();
   if (state.view === 'record') return renderRecord();
+  if (state.view === 'matches') {
+    loadBoard();
+    fetchPredictions(state.date, true).then((d) => { if (d) rerenderViews(); }).catch(() => {});
+    return;
+  }
   try {
-    await loadPredictions(true);
+    setStatus('getting the latest predictions…', 'busy');
+    await fetchPredictions(state.date, true);
     renderPredView();
   } catch (err) {
-    $('#board').innerHTML = `<div class="err-box"><strong>Analysis failed</strong><br>${esc(err.message)}</div>`;
-    setStatus('error', 'err');
+    if (state.preds && state.preds.date === state.date) setStatus('offline — showing the predictions saved on this device', 'err');
+    else {
+      $('#board').innerHTML = `<div class="err-box"><strong>Analysis failed</strong><br>${esc(err.message)}</div>`;
+      setStatus('error', 'err');
+    }
   }
 }
 
@@ -1267,10 +1500,14 @@ function setView(view) {
   if (view === 'record') { renderRecord(); return; }
   if (view === 'strongest') { if (window.renderStrongest) window.renderStrongest(); return; }
 
-  renderPredView(); // shows the loading block until data arrives
+  renderPredView(); // shows the loading block until data arrives (a saved copy appears at once)
   loadPredictions(false)
     .then(() => { if (state.view === view) renderPredView(); })
     .catch((err) => {
+      if (state.preds && state.preds.date === state.date) {
+        setStatus('offline — showing the predictions saved on this device', 'err');
+        return;
+      }
       $('#board').innerHTML = `<div class="err-box"><strong>Analysis failed</strong><br>${esc(err.message)}</div>`;
       setStatus('error', 'err');
     });
@@ -1279,6 +1516,7 @@ function setView(view) {
 function setDate(iso) {
   state.date = iso;
   state.preds = null;
+  if (state.board && state.board.date !== iso) state.board = null;
   state.selectedId = null;
   closeDetail();
   $('#dateInput').value = iso;
@@ -1317,9 +1555,22 @@ function init() {
   });
 
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDetail(); });
+  const upd = $('#updateNow');
+  if (upd) upd.addEventListener('click', () => refresh());
 
-  loadBoard();
-  scheduleRefresh();
+  // 05:00 Ghana time while the page is open: the day database is wiped; start the new day
+  DayCache.onNewDay(() => {
+    state.preds = null;
+    state.board = null;
+    state.analysis = null;
+    closeDetail();
+    setStatus('new day (05:00 Ghana time) — loading today\'s fixtures…', 'busy');
+    setDate(todayISO());
+  });
+  DayCache.init().catch(() => null).finally(() => {
+    loadBoard();
+    scheduleRefresh();
+  });
 }
 
 let refreshTimer = null;
@@ -1328,7 +1579,8 @@ function scheduleRefresh() {
   if (!state.autoRefresh) return;
   refreshTimer = setInterval(() => {
     if (document.hidden || state.loadingDetail) return;
-    if (state.view === 'matches') loadBoard();
+    // the board is cheap: it carries live and final scores onto the saved predictions
+    if (['matches', 'predictions', 'top', 'general', 'acca'].includes(state.view)) loadBoard();
   }, 60000);
 }
 

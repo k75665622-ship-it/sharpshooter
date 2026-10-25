@@ -368,7 +368,8 @@ global.fetch = async (input, init) => {
       console.log('  SKIP  jsdom not installed (set JSDOM_PATH to run the UI pass)');
     }
     if (JSDOM) {
-      const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8').replace('<script src="/app.js"></script>', '').replace('<script src="/strongest.js"></script>', '');
+      const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8').replace('<script src="/app.js"></script>', '').replace('<script src="/strongest.js"></script>', '')
+        .replace('<script src="/shared.js"></script>', '').replace('<script src="/daycache.js"></script>', '');
       const errors = [];
       const dom = new JSDOM(html, { url: base + '/', runScripts: 'dangerously', pretendToBeVisual: true });
       const w = dom.window;
@@ -376,6 +377,12 @@ global.fetch = async (input, init) => {
       w.console.error = (...a) => errors.push(a.join(' '));
       w.addEventListener('error', (e) => errors.push(String(e.message)));
       const sc = w.document.createElement('script');
+      // the day database scripts first (jsdom has no IndexedDB: daycache.js falls back to memory)
+      for (const f of ['shared.js', 'daycache.js']) {
+        const s0 = dom.window.document.createElement('script');
+        s0.textContent = fs.readFileSync(path.join(__dirname, '..', 'public', f), 'utf8');
+        dom.window.document.body.appendChild(s0);
+      }
       sc.textContent = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8');
       w.document.body.appendChild(sc);
       const sc2 = w.document.createElement('script');
