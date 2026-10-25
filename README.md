@@ -719,3 +719,14 @@ behaviour. If you want more picks, the `lean` tier is where they live.
   pick. **GG/NG 2+ stays paper** until its own record passes Rule 34.
 - **Cross-league ties and early season** are the weakest spots; the engine flags them and the gates get stricter.
 - **Nothing is guaranteed.** This is an analytical tool. It quantifies probability; it does not predict the future.
+
+## 24-hour day database (resets 05:00 Ghana time)
+
+The day's predictions are saved twice, and both copies are wiped when the prediction day changes at **05:00 Ghana time** (Africa/Accra):
+
+- **In your browser** (IndexedDB, `public/daycache.js`): predictions, the fixture board, Strongest Picks and every match you open. Come back later, even after closing the browser, and they appear **instantly** while a fresh copy loads quietly in the background.
+- **On the server** (`data/daybook/<day>/`, `lib/daybook.js`): every visitor gets the saved day at once, rebuilt in the background when it is more than 3 minutes old.
+
+**Played matches stay.** A match that has kicked off keeps the prediction made *before* kick-off (frozen, never re-predicted) and gets a ✓ / ✕ for the main pick, value pick, methodology pick, result, goals, BTTS and exact score, plus a "Today so far" scoreboard on Every Match. The morning accumulator is kept with each leg ticked or crossed; a newer one for the matches still to play sits beside it. The merge and settle rules live in `public/shared.js`, used by both server and browser.
+
+`GET /api/daybook` shows what is stored. `GET /api/warmup` builds the day in the background (it does nothing when the saved copy is under 15 minutes old). On Render's free tier the server disk is wiped when the service sleeps, so the browser copy is what keeps your day; to keep the server copy too, point a free cron service at `/api/warmup` at 05:05 and at `/api/health` every 10 minutes. Change the reset with `DAYBOOK_TZ` / `DAYBOOK_RESET_HOUR`.

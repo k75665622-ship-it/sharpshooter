@@ -23,6 +23,8 @@
  *   GET /api/strongest?date=          -> Strongest Picks: nine SportyBet market groups per match, one pick per
  *                                        match when every independent view agrees (no fixed number of picks)
  *   GET /api/strongest/record[?format=csv] -> the Strongest Picks track record
+ *   GET /api/daybook                  -> the 24-hour day book (resets 05:00 Ghana time): what is stored
+ *   GET /api/warmup?date=             -> build the day's predictions in the background (for a morning pinger)
  */
 
 const http = require('http');
@@ -41,6 +43,8 @@ const ACC = require('./lib/intel/accumulator');
 const HTTPC = require('./lib/crawler/http');
 const WH = require('./lib/crawler/warehouse');
 const STR = require('./lib/strongest');
+const DAYBOOK = require('./lib/daybook');
+const SS = require('./public/shared.js');
 
 const readJson = (f) => {
   try {
@@ -182,15 +186,11 @@ async function buildBoard(dateYmd) {
 
 async function getAnalysis(league, eventId, year, matchHint, dateYmd) {
   const key = `${league}:${eventId}`;
-  const hit = analysisCache.get(key);
-  if (hit && Date.now() - hit.at < ANALYSIS_TTL) return hit.value;
 
+  // The fixture as it stands now (state and score): from the board the caller passed,
+  // otherwise rebuilt from the scoreboard of the REQUESTED date (not today).
   let match = matchHint;
   if (!match) {
-    // Rebuild the match from the scoreboard if the caller did not supply one.
-    // This must use the *requested* date, not today — otherwise clicking any
-    // fixture outside today's board fails with "Match not found" and date
-    // browsing silently only ever works for the current day.
     const day = dateYmd || espn.ymd(new Date());
     const raw = await espn.scoreboardRaw(league, day);
     const ev = raw.events.find((e) => String(e.id) === String(eventId));
@@ -199,8 +199,31 @@ async function getAnalysis(league, eventId, year, matchHint, dateYmd) {
     if (!match) throw new Error('Match could not be parsed');
     year = year || raw.season;
   }
+  const started = !!(match.state && match.state !== 'pre');
+  const hit = analysisCache.get(key);
+  const saved = DAYBOOK.getReport(league, eventId);
+
+  if (started) {
+    // Kicked off: the prediction made before kick-off stands, with the live / final score on it.
+    if (saved) return DAYBOOK.withLive(saved.report, match);
+    if (hit && !hit.value.lateAnalysis) return DAYBOOK.withLive(hit.value, match);
+    if (hit) return hit.value;
+  } else {
+    if (hit && Date.now() - hit.at < ANALYSIS_TTL) return hit.value;
+    if (saved && Date.now() - saved.savedAt < ANALYSIS_TTL) {
+      analysisCache.set(key, { at: saved.savedAt, value: saved.report });
+      return saved.report;
+    }
+  }
 
   const report = await E.analyseMatch(match, year || new Date().getUTCFullYear());
+  report.analysedAt = new Date().toISOString();
+  if (started) {
+    // No pre-match prediction was saved (e.g. the server was asleep at kick-off): say so.
+    report.lateAnalysis = true;
+  } else {
+    DAYBOOK.saveReport(report);
+  }
   analysisCache.set(key, { at: Date.now(), value: report });
   return report;
 }
@@ -210,9 +233,10 @@ async function analyseDay(dateYmd, limit) {
   const board = await buildBoard(dateYmd);
   const all = board.leagues.flatMap((lg) => lg.matches);
 
-  // Prefer matches that have bookmaker odds and are not already finished.
+  // Analyse the matches still to play, those with bookmaker odds first. A match that has kicked
+  // off is never re-predicted: it keeps its pre-match prediction from the day book (below).
   const candidates = all
-    .filter((m) => m.state !== 'post')
+    .filter((m) => m.state === 'pre')
     .sort((a, b) => {
       const ao = a.odds ? 0 : 1;
       const bo = b.odds ? 0 : 1;
@@ -237,6 +261,11 @@ async function analyseDay(dateYmd, limit) {
     }
   }
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length || 1) }, worker));
+  for (const m of all) {
+    if (m.state === 'pre') continue;
+    const saved = DAYBOOK.getReport(m.league, m.id);
+    if (saved) reports.push(DAYBOOK.withLive(saved.report, m));
+  }
   return { board, reports };
 }
 
@@ -303,13 +332,13 @@ async function buildBankers(dateYmd, limit) {
 }
 
 /**
- * Methodology predictions for a day.
+ * The predictions payload from a day's analysed reports.
  *
  * A fixture appears under every market it genuinely falls under. `headline` is
  * the strongest single prediction per fixture, ranked LOCK > PREDICT > PAPER.
+ * `fixtures` carries every match's state and score so results can be shown.
  */
-async function buildPredictions(dateYmd, limit) {
-  const { reports } = await analyseDay(dateYmd, limit);
+function assemblePredictions(dateYmd, board, reports) {
   // Write every pre-match prediction to the track record before anyone sees a result.
   try {
     LEDGER.record(reports);
@@ -331,8 +360,16 @@ async function buildPredictions(dateYmd, limit) {
   const statusCounts = {};
   for (const h of agg.headline) statusCounts[h.prediction.status] = (statusCounts[h.prediction.status] || 0) + 1;
 
+  // when each fixture was predicted: a played match keeps the prediction made before kick-off
+  const atOf = new Map(reports.map((r) => [String(r.match.id), r.analysedAt || null]));
+  const stamp = (e) => ({ ...e, at: atOf.get(String(e.match.id)) || null });
+  agg.headline = agg.headline.map(stamp);
+  for (const k of Object.keys(agg.byMethod)) agg.byMethod[k] = agg.byMethod[k].map(stamp);
   return {
     date: isoFromYmd(dateYmd),
+    generatedAt: new Date().toISOString(),
+    day: DAYBOOK.dayKey(),
+    fixtures: SS.fixturesFrom(board.leagues.flatMap((lg) => lg.matches)),
     analysed: reports.length,
     analysable: analysable.length,
     predicted: agg.headline.length,
@@ -345,12 +382,58 @@ async function buildPredictions(dateYmd, limit) {
     // no methodology still gets a result call, goals call, BTTS call and a predicted score.
     general: analysable
       .filter((r) => r.general && !r.general.error)
-      .map((r) => ({ match: briefFull(r.match), general: r.general, methodology: r.methodology && r.methodology.headline ? { id: r.methodology.headline.id, status: r.methodology.headline.status, label: r.methodology.headline.pick.label } : null }))
+      .map((r) => ({ match: briefFull(r.match), at: r.analysedAt || null, general: r.general, methodology: r.methodology && r.methodology.headline ? { id: r.methodology.headline.id, status: r.methodology.headline.status, label: r.methodology.headline.pick.label } : null }))
       .sort((a, b) => new Date(a.match.date) - new Date(b.match.date)),
     accumulator,
     skipped: analysable.length - agg.headline.length,
     unanalysable: reports.filter((r) => !r.analysable).map((r) => ({ match: brief(r.match), reason: r.reason || null })),
   };
+}
+
+/**
+ * The day's predictions, built, merged with what the day book already holds for that date
+ * (so a match that has kicked off keeps its pre-match prediction and gets its result), saved.
+ */
+const predInflight = new Map();
+function freshPredictions(dateYmd, limit) {
+  const key = `${dateYmd}|${limit}`;
+  if (predInflight.has(key)) return predInflight.get(key);
+  const p = (async () => {
+    const { board, reports } = await analyseDay(dateYmd, limit);
+    const out = assemblePredictions(dateYmd, board, reports);
+    const iso = isoFromYmd(dateYmd);
+    const prev = DAYBOOK.getPayload('predictions', iso);
+    const merged = SS.mergePredictions(prev ? prev.payload : null, out);
+    DAYBOOK.savePayload('predictions', iso, merged);
+    return merged;
+  })().finally(() => predInflight.delete(key));
+  predInflight.set(key, p);
+  return p;
+}
+
+const PRED_FRESH_MS = 3 * 60 * 1000;
+/**
+ * Stale-while-revalidate: a saved copy of the day is answered at once (with the latest scores
+ * laid over it) and rebuilt in the background when it is older than three minutes.
+ */
+async function predictionsFor(dateYmd, limit, opts = {}) {
+  const iso = isoFromYmd(dateYmd);
+  const saved = opts.refresh ? null : DAYBOOK.getPayload('predictions', iso);
+  if (saved) {
+    const age = Date.now() - saved.savedAt;
+    const refreshing = age >= PRED_FRESH_MS;
+    if (refreshing) freshPredictions(dateYmd, limit).catch(() => null);
+    let payload = saved.payload;
+    try {
+      const board = await buildBoard(dateYmd);
+      payload = SS.mergePredictions(saved.payload, { ...saved.payload, fixtures: SS.fixturesFrom(board.leagues.flatMap((lg) => lg.matches)) });
+    } catch {
+      /* the saved copy is still worth showing */
+    }
+    return { ...payload, cache: { savedAt: new Date(saved.savedAt).toISOString(), ageSec: Math.round(age / 1000), refreshing, day: DAYBOOK.dayKey() } };
+  }
+  const fresh = await freshPredictions(dateYmd, limit);
+  return { ...fresh, cache: { savedAt: new Date().toISOString(), ageSec: 0, refreshing: false, day: DAYBOOK.dayKey() } };
 }
 
 function brief(m) {
@@ -370,10 +453,8 @@ function briefFull(m) {
  */
 const strongestCache = new Map();
 const strongestInflight = new Map();
-async function strongestDay(dateYmd, limit) {
+function freshStrongest(dateYmd, limit) {
   const key = `${dateYmd}|${limit}`;
-  const hit = strongestCache.get(key);
-  if (hit && Date.now() - hit.at < STR.CFG.dayCacheMinutes * 60 * 1000) return hit.value;
   // two visitors opening the tab at once share one build
   if (strongestInflight.has(key)) return strongestInflight.get(key);
   const p = (async () => {
@@ -386,13 +467,28 @@ async function strongestDay(dateYmd, limit) {
     }
     strongestCache.set(key, { at: Date.now(), value: day });
     if (strongestCache.size > 20) strongestCache.delete(strongestCache.keys().next().value);
+    DAYBOOK.savePayload('strongest', isoFromYmd(dateYmd), day);
     return day;
   })().finally(() => strongestInflight.delete(key));
   strongestInflight.set(key, p);
   return p;
 }
-async function buildStrongest(dateYmd, limit) {
-  const day = await strongestDay(dateYmd, limit);
+async function strongestDay(dateYmd, limit, opts = {}) {
+  const key = `${dateYmd}|${limit}`;
+  const ttl = STR.CFG.dayCacheMinutes * 60 * 1000;
+  const hit = strongestCache.get(key);
+  if (!opts.refresh && hit && Date.now() - hit.at < ttl) return hit.value;
+  // the day book: answer at once, rebuild in the background when stale
+  const saved = opts.refresh ? null : DAYBOOK.getPayload('strongest', isoFromYmd(dateYmd));
+  if (saved) {
+    const age = Date.now() - saved.savedAt;
+    if (age >= ttl) freshStrongest(dateYmd, limit).catch(() => null);
+    return { ...saved.payload, cache: { savedAt: new Date(saved.savedAt).toISOString(), ageSec: Math.round(age / 1000), refreshing: age >= ttl } };
+  }
+  return freshStrongest(dateYmd, limit);
+}
+async function buildStrongest(dateYmd, limit, opts = {}) {
+  const day = await strongestDay(dateYmd, limit, opts);
   // settle finished picks in the background (throttled inside)
   STR.record.settleAll().catch(() => 0);
   const now = Date.now();
@@ -507,7 +603,23 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/predictions') {
       const dateYmd = normaliseDate(url.searchParams.get('date'));
       const limit = Number(url.searchParams.get('limit')) || 60;
-      return json(res, 200, await buildPredictions(dateYmd, limit));
+      return json(res, 200, await predictionsFor(dateYmd, limit, { refresh: url.searchParams.get('refresh') === '1' }));
+    }
+
+    if (p === '/api/daybook') {
+      return json(res, 200, DAYBOOK.status());
+    }
+
+    if (p === '/api/warmup') {
+      // For a morning pinger (e.g. a free cron service at 05:05): wakes the server and builds
+      // the day in the background so the first visitor gets it instantly.
+      const dateYmd = normaliseDate(url.searchParams.get('date'));
+      const limit = Number(url.searchParams.get('limit')) || 60;
+      // a fresh saved copy means nothing to do (a keep-awake pinger must not re-analyse all day)
+      const saved = DAYBOOK.getPayload('predictions', isoFromYmd(dateYmd));
+      const build = url.searchParams.get('force') === '1' || !saved || Date.now() - saved.savedAt >= 15 * 60 * 1000;
+      if (build) freshPredictions(dateYmd, limit).then(() => freshStrongest(dateYmd, limit)).catch(() => null);
+      return json(res, 202, { ok: true, date: isoFromYmd(dateYmd), building: build, daybook: DAYBOOK.status() });
     }
 
     if (p === '/api/methodology') {
@@ -537,7 +649,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/accumulator') {
       const dateYmd = normaliseDate(url.searchParams.get('date'));
       const limit = Number(url.searchParams.get('limit')) || 60;
-      const out = await buildPredictions(dateYmd, limit);
+      const out = await predictionsFor(dateYmd, limit, { refresh: url.searchParams.get('refresh') === '1' });
       return json(res, 200, { date: out.date, accumulator: out.accumulator });
     }
 
@@ -557,7 +669,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/strongest') {
       const dateYmd = normaliseDate(url.searchParams.get('date'));
       const limit = Number(url.searchParams.get('limit')) || 60;
-      return json(res, 200, await buildStrongest(dateYmd, limit));
+      return json(res, 200, await buildStrongest(dateYmd, limit, { refresh: url.searchParams.get('refresh') === '1' }));
     }
 
     if (p === '/api/strongest/record') {
@@ -581,6 +693,18 @@ const server = http.createServer(async (req, res) => {
     return json(res, 500, { error: String(err.message || err), stack: process.env.DEBUG ? err.stack : undefined });
   }
 });
+
+// Every 10 minutes: when 05:00 Ghana time passes, the day book wipes the old day and the new
+// day's predictions are built in the background (if the server is awake at that moment).
+let lastDay = DAYBOOK.ensureDay();
+const dayTimer = setInterval(() => {
+  const d = DAYBOOK.ensureDay();
+  if (d === lastDay) return;
+  lastDay = d;
+  const today = todayUTC();
+  freshPredictions(today, 60).then(() => freshStrongest(today, 60)).catch(() => null);
+}, 10 * 60 * 1000);
+if (dayTimer.unref) dayTimer.unref();
 
 server.listen(PORT, HOST, () => {
   const url = `http://${HOST}:${PORT}`;

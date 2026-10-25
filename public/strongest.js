@@ -17,15 +17,30 @@
   async function load(force) {
     const date = state.date;
     if (!force && SP.data && SP.date === date) return SP.data;
+    // this browser's saved copy of the day (public/daycache.js): shown at once
+    if (!force && window.DayCache && (!SP.data || SP.date !== date)) {
+      const saved = await window.DayCache.getPayload('strongest', date);
+      if (saved && state.date === date && (!SP.data || SP.date !== date)) {
+        SP.data = saved;
+        SP.date = date;
+        if (state.view === 'strongest') render();
+      }
+    }
     const seq = ++SP.seq;
     SP.loading = true;
     SP.error = null;
     try {
-      const d = await api(`/api/strongest?date=${encodeURIComponent(date)}`);
+      const d = await api(`/api/strongest?date=${encodeURIComponent(date)}${force ? '&refresh=1' : ''}`);
       if (seq !== SP.seq) return null;
-      SP.data = d;
+      // keep this morning's picks once their matches start (public/shared.js)
+      const merged = window.SS ? window.SS.mergeStrongest(SP.data && SP.date === date ? SP.data : null, d) : d;
+      SP.data = merged;
       SP.date = date;
-      return d;
+      if (window.DayCache) window.DayCache.putPayload('strongest', date, merged);
+      // the server answered from its day book and is rebuilding: look again shortly
+      clearTimeout(SP.poll);
+      if (d.cache && d.cache.refreshing) SP.poll = setTimeout(() => { if (state.view === 'strongest' && state.date === date) window.renderStrongest(); }, 20000);
+      return merged;
     } catch (err) {
       if (seq === SP.seq) SP.error = err;
       throw err;

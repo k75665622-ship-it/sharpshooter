@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "verify": "node test/v6_unit.js && node test/v5_unit.js && node test/strongest_unit.js && node test/strongest_record.js && node test/e2e_offline.js && node test_crosscheck.js && node test_consensus_price.js && node test_news.js && node test_quota.js && node test_methodology.js && node test_pricebacktest.js",
+    "verify": "node test/daybook_unit.js && node test/v6_unit.js && node test/v5_unit.js && node test/strongest_unit.js && node test/strongest_record.js && node test/e2e_offline.js && node test_crosscheck.js && node test_consensus_price.js && node test_news.js && node test_quota.js && node test_methodology.js && node test_pricebacktest.js",
     "test:strongest": "node test/strongest_unit.js && node test/strongest_record.js",
     "test:engine": "node test_engine.js",
     "test:board": "node test_board.js",
