@@ -33,6 +33,7 @@ so a factor means exactly the same thing in research and on the site.
 | 5 | `node research/v6/patterns_study.js features.csv lib/intel/rules.json` | 46 popular patterns / traps, each tested on 2005-23 and confirmed on 2023-26 |
 | 6 | `SHARPSHOOTER_V6_MODELS=<honest compact> DUMP_FILE=final_test.jsonl node research/v6/backtest_decision.js features.csv final_test.json 2023-07-01` | **the production decision code** (`lib/intel`) on every held-out match (also run on the tune window to set thresholds; `DECISION_OPTS` overrides them) |
 | 7 | `node research/backtest_methods.js ...` (v5, now with fixture ids) then `node research/v6/acca_study.js methods_ids.json final_test.jsonl acca.json 2023-07-01` | the double-confirmed accumulator rule, with the production leg selection (`lib/intel/accumulator.js`) |
+| 7b | `SHARPSHOOTER_V6_MODELS=<honest compact> node research/v6/banker_dump.js features.csv methods_ids.json banker_dump.jsonl 2019-07-01` then `RECORD_FILE=lib/banker_record.json node research/v6/banker_study.js banker_dump.jsonl banker.json` (`sweep` mode: how the thresholds were chosen, tuning seasons only) | the High Banker rule (`lib/banker.js`, production code) on every priced match: legs, the daily 3.0+ slip and the bigger slips |
 | 8 | `node research/v6/write_records.js <dir>` | `lib/intel/record.json` and `lib/intel/acca_record.json` (the numbers the site shows) |
 
 Exploratory: `value_study.py` (does the factor model change which bets are worth taking? bucketed favourite

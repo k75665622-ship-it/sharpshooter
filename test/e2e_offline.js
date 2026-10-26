@@ -325,6 +325,11 @@ global.fetch = async (input, init) => {
     t('every accumulator leg passed a methodology AND the normal prediction', (preds.accumulator.legs || []).every((l) => ['LOCK', 'PREDICT'].includes(l.methodology.status) && ['main', 'call', 'safer'].includes(l.agreement)));
     const acc = (await get(`/api/accumulator?date=${day}`)).body;
     t('accumulator endpoint', acc.accumulator && Array.isArray(acc.accumulator.options), JSON.stringify(acc).slice(0, 200));
+    t('predictions carry the High Banker with its measured record', preds.banker && Array.isArray(preds.banker.bankers) && preds.banker.rules.length >= 5 && preds.banker.record && preds.banker.record.heldOut && preds.banker.record.heldOut.slip.slips > 100, JSON.stringify(preds.banker && { n: preds.banker.bankers.length, err: preds.banker.error }));
+    t('every banker passed every check', (preds.banker.bankers || []).every((l) => l.checks.length >= 6 && l.checks.every((c) => c.ok)));
+    t('a High Banker slip always reaches its target', !preds.banker.slip || preds.banker.slip.odds >= preds.banker.target - 1e-9);
+    const bkr = (await get(`/api/banker?date=${day}`)).body;
+    t('banker endpoint', bkr.banker && Array.isArray(bkr.banker.bankers) && bkr.banker.target === 3, JSON.stringify(bkr).slice(0, 200));
     const crawl = (await get('/api/crawler')).body;
     t('crawler reports football-data requests and honours robots.txt', crawl.hosts && crawl.hosts['www.football-data.co.uk'] && crawl.hosts['www.football-data.co.uk'].ok >= 2 && crawl.hosts['www.football-data.co.uk'].robotsBlocked === 0, JSON.stringify(crawl.hosts && crawl.hosts['www.football-data.co.uk']));
     const ir = (await get('/api/intel-research')).body;
@@ -369,7 +374,7 @@ global.fetch = async (input, init) => {
     }
     if (JSDOM) {
       const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8').replace('<script src="/app.js"></script>', '').replace('<script src="/strongest.js"></script>', '')
-        .replace('<script src="/shared.js"></script>', '').replace('<script src="/daycache.js"></script>', '');
+        .replace('<script src="/shared.js"></script>', '').replace('<script src="/daycache.js"></script>', '').replace('<script src="/banker.js"></script>', '');
       const errors = [];
       const dom = new JSDOM(html, { url: base + '/', runScripts: 'dangerously', pretendToBeVisual: true });
       const w = dom.window;
@@ -388,6 +393,9 @@ global.fetch = async (input, init) => {
       const sc2 = w.document.createElement('script');
       sc2.textContent = fs.readFileSync(path.join(__dirname, '..', 'public', 'strongest.js'), 'utf8');
       w.document.body.appendChild(sc2);
+      const sc3 = w.document.createElement('script');
+      sc3.textContent = fs.readFileSync(path.join(__dirname, '..', 'public', 'banker.js'), 'utf8');
+      w.document.body.appendChild(sc3);
       w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
       const settle = (ms) => new Promise((r) => setTimeout(r, ms));
       w.eval(`setDate(${JSON.stringify(day)})`);
@@ -395,7 +403,7 @@ global.fetch = async (input, init) => {
       const board = w.document.querySelector('#board').textContent;
       t('Matches tab lists the fixtures', /Arsenal/.test(board) && /Sunderland/.test(board), board.slice(0, 200));
       t('Matches tab shows predicted score chips', w.document.querySelectorAll('.sc-chip').length === 2);
-      for (const view of ['strongest', 'predictions', 'top', 'general', 'acca', 'record', 'method']) {
+      for (const view of ['banker', 'strongest', 'predictions', 'top', 'general', 'acca', 'record', 'method']) {
         w.eval(`setView(${JSON.stringify(view)})`);
         await settle(1200);
         const txt = w.document.querySelector('#board').textContent;

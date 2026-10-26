@@ -1,0 +1,324 @@
+{
+ "note": "The production High Banker rule (lib/banker.js) on history: thresholds chosen on the tuning seasons, reported once on the held-out seasons. v6 models trained on 2005-2019 only. Odds: Bet365 where the archive has a price, otherwise estimated from the de-vigged price and the match margin.",
+ "config": {
+  "version": "1.0",
+  "target": 3,
+  "bigger": [
+   5,
+   10,
+   20
+  ],
+  "minProb": 0.74,
+  "minBase": 0.72,
+  "minShift": -0.005,
+  "maxShift": 0.08,
+  "minOdds": 1.15,
+  "maxOdds": 1.6,
+  "minCoverage": 0.6,
+  "minGames": 10,
+  "keys": [
+   "1",
+   "2",
+   "1X",
+   "X2",
+   "DNB_H",
+   "DNB_A",
+   "O1.5",
+   "O2.5",
+   "U2.5",
+   "U3.5",
+   "BTTS_Y",
+   "BTTS_N",
+   "TTH_O0.5",
+   "TTA_O0.5",
+   "TTH_O1.5",
+   "TTA_O1.5"
+  ]
+ },
+ "tuning": {
+  "window": [
+   "2019-07-01",
+   "2023-06-30"
+  ],
+  "legs": {
+   "n": 21427,
+   "hit": 0.783,
+   "stated": 0.781,
+   "perDay": 15.81,
+   "roiBest": 0.013,
+   "nBest": 4362,
+   "tripleConfirmed": {
+    "n": 2390,
+    "hit": 0.806,
+    "stated": 0.793
+   },
+   "byKey": {
+    "1": {
+     "n": 207,
+     "hit": 0.758,
+     "stated": 0.756
+    },
+    "2": {
+     "n": 66,
+     "hit": 0.697,
+     "stated": 0.754
+    },
+    "U3.5": {
+     "n": 8245,
+     "hit": 0.778,
+     "stated": 0.785
+    },
+    "O1.5": {
+     "n": 5602,
+     "hit": 0.781,
+     "stated": 0.777
+    },
+    "1X": {
+     "n": 2652,
+     "hit": 0.801,
+     "stated": 0.794
+    },
+    "TTH_O0.5": {
+     "n": 1582,
+     "hit": 0.779,
+     "stated": 0.76
+    },
+    "TTA_O0.5": {
+     "n": 1394,
+     "hit": 0.773,
+     "stated": 0.758
+    },
+    "X2": {
+     "n": 976,
+     "hit": 0.802,
+     "stated": 0.784
+    },
+    "DNB_H": {
+     "n": 328,
+     "hit": 0.872,
+     "stated": 0.86
+    },
+    "TTH_O1.5": {
+     "n": 200,
+     "hit": 0.76,
+     "stated": 0.757
+    },
+    "DNB_A": {
+     "n": 74,
+     "hit": 0.811,
+     "stated": 0.855
+    },
+    "O2.5": {
+     "n": 56,
+     "hit": 0.857,
+     "stated": 0.754
+    },
+    "TTA_O1.5": {
+     "n": 39,
+     "hit": 0.667,
+     "stated": 0.754
+    },
+    "U2.5": {
+     "n": 3,
+     "hit": 0.667,
+     "stated": 0.747
+    },
+    "BTTS_N": {
+     "n": 2,
+     "hit": 0.5,
+     "stated": 0.762
+    },
+    "BTTS_Y": {
+     "n": 1,
+     "hit": 1,
+     "stated": 0.754
+    }
+   }
+  },
+  "slip": {
+   "days": 1361,
+   "daysWithBankers": 1316,
+   "slips": 937,
+   "coverage": 0.688,
+   "hit": 0.361,
+   "stated": 0.317,
+   "avgLegs": 5.074,
+   "avgOdds": 3.047,
+   "roi": 0.086,
+   "oddsHist": {
+    "3.0-3.5": 931,
+    "3.5-4": 6
+   },
+   "fullyPriced": {
+    "n": 107,
+    "hit": 0.411,
+    "roiBet365": -0.01,
+    "roiBest": 0.226
+   }
+  },
+  "bigger": {
+   "5": {
+    "slips": 785,
+    "coverage": 0.577,
+    "hit": 0.185,
+    "stated": 0.186,
+    "avgOdds": 5.065,
+    "avgLegs": 7.262
+   },
+   "10": {
+    "slips": 628,
+    "coverage": 0.461,
+    "hit": 0.086,
+    "stated": 0.09,
+    "avgOdds": 10.101,
+    "avgLegs": 10.271
+   },
+   "20": {
+    "slips": 510,
+    "coverage": 0.375,
+    "hit": 0.035,
+    "stated": 0.043,
+    "avgOdds": 20.181,
+    "avgLegs": 13.302
+   }
+  }
+ },
+ "heldOut": {
+  "window": [
+   "2023-07-01",
+   "2099-01-01"
+  ],
+  "legs": {
+   "n": 12121,
+   "hit": 0.778,
+   "stated": 0.776,
+   "perDay": 12.88,
+   "roiBest": 0.012,
+   "nBest": 2693,
+   "tripleConfirmed": {
+    "n": 1583,
+    "hit": 0.783,
+    "stated": 0.786
+   },
+   "byKey": {
+    "1": {
+     "n": 146,
+     "hit": 0.705,
+     "stated": 0.756
+    },
+    "2": {
+     "n": 36,
+     "hit": 0.778,
+     "stated": 0.756
+    },
+    "U3.5": {
+     "n": 4033,
+     "hit": 0.772,
+     "stated": 0.779
+    },
+    "O1.5": {
+     "n": 3059,
+     "hit": 0.767,
+     "stated": 0.771
+    },
+    "1X": {
+     "n": 1670,
+     "hit": 0.815,
+     "stated": 0.791
+    },
+    "TTA_O0.5": {
+     "n": 1092,
+     "hit": 0.767,
+     "stated": 0.759
+    },
+    "TTH_O0.5": {
+     "n": 1025,
+     "hit": 0.772,
+     "stated": 0.762
+    },
+    "X2": {
+     "n": 542,
+     "hit": 0.799,
+     "stated": 0.782
+    },
+    "DNB_H": {
+     "n": 189,
+     "hit": 0.878,
+     "stated": 0.855
+    },
+    "TTH_O1.5": {
+     "n": 175,
+     "hit": 0.8,
+     "stated": 0.756
+    },
+    "O2.5": {
+     "n": 72,
+     "hit": 0.708,
+     "stated": 0.753
+    },
+    "TTA_O1.5": {
+     "n": 44,
+     "hit": 0.75,
+     "stated": 0.753
+    },
+    "DNB_A": {
+     "n": 32,
+     "hit": 0.813,
+     "stated": 0.847
+    },
+    "U2.5": {
+     "n": 6,
+     "hit": 1,
+     "stated": 0.75
+    }
+   }
+  },
+  "slip": {
+   "days": 945,
+   "daysWithBankers": 861,
+   "slips": 547,
+   "coverage": 0.579,
+   "hit": 0.336,
+   "stated": 0.305,
+   "avgLegs": 4.996,
+   "avgOdds": 3.043,
+   "roi": 0.008,
+   "oddsHist": {
+    "3.0-3.5": 545,
+    "3.5-4": 2
+   },
+   "fullyPriced": {
+    "n": 69,
+    "hit": 0.391,
+    "roiBet365": -0.033,
+    "roiBest": 0.153
+   }
+  },
+  "bigger": {
+   "5": {
+    "slips": 458,
+    "coverage": 0.485,
+    "hit": 0.181,
+    "stated": 0.176,
+    "avgOdds": 5.06,
+    "avgLegs": 7.153
+   },
+   "10": {
+    "slips": 369,
+    "coverage": 0.39,
+    "hit": 0.084,
+    "stated": 0.083,
+    "avgOdds": 10.119,
+    "avgLegs": 10.111
+   },
+   "20": {
+    "slips": 303,
+    "coverage": 0.321,
+    "hit": 0.05,
+    "stated": 0.039,
+    "avgOdds": 20.215,
+    "avgLegs": 13.132
+   }
+  }
+ }
+}
