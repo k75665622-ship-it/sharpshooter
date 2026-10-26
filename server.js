@@ -23,6 +23,8 @@
  *   GET /api/strongest?date=          -> Strongest Picks: nine SportyBet market groups per match, one pick per
  *                                        match when every independent view agrees (no fixed number of picks)
  *   GET /api/strongest/record[?format=csv] -> the Strongest Picks track record
+ *   GET /api/banker?date=             -> High Banker: the day's safest selections (every check passed) and the
+ *                                        most likely slip reaching 3.0+ odds; no upper limit, never padded
  *   GET /api/daybook                  -> the 24-hour day book (resets 05:00 Ghana time): what is stored
  *   GET /api/warmup?date=             -> build the day's predictions in the background (for a morning pinger)
  */
@@ -44,6 +46,7 @@ const HTTPC = require('./lib/crawler/http');
 const WH = require('./lib/crawler/warehouse');
 const STR = require('./lib/strongest');
 const DAYBOOK = require('./lib/daybook');
+const BANKER = require('./lib/banker');
 const SS = require('./public/shared.js');
 
 const readJson = (f) => {
@@ -355,6 +358,14 @@ function assemblePredictions(dateYmd, board, reports) {
   } catch (err) {
     accumulator = { error: String(err && err.message ? err.message : err), legs: [], options: [] };
   }
+  // the High Banker: the day's safest selections and the 3.0+ slip they make (lib/banker.js)
+  let banker = null;
+  try {
+    banker = BANKER.forReports(reports);
+    LEDGER.recordBanker(banker, isoFromYmd(dateYmd));
+  } catch (err) {
+    banker = { error: String(err && err.message ? err.message : err), bankers: [], slip: null, all: null, near: [], target: BANKER.CFG.target, reached: false };
+  }
   const withHistory = analysable.filter((r) => r.dataProvenance && r.dataProvenance.hasHistory).length;
   const withElo = analysable.filter((r) => r.dataProvenance && r.dataProvenance.hasElo).length;
   const statusCounts = {};
@@ -385,6 +396,7 @@ function assemblePredictions(dateYmd, board, reports) {
       .map((r) => ({ match: briefFull(r.match), at: r.analysedAt || null, general: r.general, methodology: r.methodology && r.methodology.headline ? { id: r.methodology.headline.id, status: r.methodology.headline.status, label: r.methodology.headline.pick.label } : null }))
       .sort((a, b) => new Date(a.match.date) - new Date(b.match.date)),
     accumulator,
+    banker,
     skipped: analysable.length - agg.headline.length,
     unanalysable: reports.filter((r) => !r.analysable).map((r) => ({ match: brief(r.match), reason: r.reason || null })),
   };
@@ -651,6 +663,13 @@ const server = http.createServer(async (req, res) => {
       const limit = Number(url.searchParams.get('limit')) || 60;
       const out = await predictionsFor(dateYmd, limit, { refresh: url.searchParams.get('refresh') === '1' });
       return json(res, 200, { date: out.date, accumulator: out.accumulator });
+    }
+
+    if (p === '/api/banker') {
+      const dateYmd = normaliseDate(url.searchParams.get('date'));
+      const limit = Number(url.searchParams.get('limit')) || 60;
+      const out = await predictionsFor(dateYmd, limit, { refresh: url.searchParams.get('refresh') === '1' });
+      return json(res, 200, { date: out.date, banker: out.banker, cache: out.cache || null });
     }
 
     if (p === '/api/crawler') {

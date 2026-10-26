@@ -990,7 +990,7 @@ function predStatus(d) {
 
 function rerenderViews() {
   if (state.view === 'matches') renderBoard();
-  else if (['predictions', 'top', 'general', 'acca'].includes(state.view)) renderPredView();
+  else if (['predictions', 'top', 'general', 'acca', 'banker'].includes(state.view)) renderPredView();
 }
 
 async function loadPredictions(force) {
@@ -1465,6 +1465,7 @@ function renderPredView() {
   else if (state.view === 'top') renderTop();
   else if (state.view === 'general') renderGeneral();
   else if (state.view === 'acca') renderAcca();
+  else if (state.view === 'banker' && window.renderBanker) window.renderBanker();
 }
 
 async function refresh() {
@@ -1580,7 +1581,7 @@ function scheduleRefresh() {
   refreshTimer = setInterval(() => {
     if (document.hidden || state.loadingDetail) return;
     // the board is cheap: it carries live and final scores onto the saved predictions
-    if (['matches', 'predictions', 'top', 'general', 'acca'].includes(state.view)) loadBoard();
+    if (['matches', 'predictions', 'top', 'general', 'acca', 'banker'].includes(state.view)) loadBoard();
   }, 60000);
 }
 

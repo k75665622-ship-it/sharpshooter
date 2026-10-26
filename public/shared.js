@@ -15,6 +15,8 @@
      attachResults()     live and final scores onto every prediction, with a tick or
                          cross for each pick, and the day's running scoreboard.
      mergeStrongest()    keep the morning's Strongest Picks once their matches start.
+     mergeBanker()       the High Banker: the morning slip frozen once a leg starts, played
+                         bankers kept as published before kick-off.
      settle()            settle any market key on a final score (same rules as
                          lib/settle.js; test/daybook_unit.js checks they agree).
    ============================================================ */
@@ -201,7 +203,40 @@
       const later = b.accumulator && b.accumulator.options && b.accumulator.options.length && !accStarted(b.accumulator) ? b.accumulator : null;
       if (later && JSON.stringify(later.options.map((o) => o.legs.map((l) => l.key + l.fixtureId))) !== JSON.stringify(a.accumulator.options.map((o) => o.legs.map((l) => l.key + l.fixtureId)))) out.accumulator.later = later;
     }
+    out.banker = mergeBanker(a.banker, b.banker, startedOf);
     return attachResults(out, t);
+  }
+
+  /** Legs combined: odds and chance (different matches are independent). */
+  function combineLegs(legs) {
+    const odds = legs.reduce((x, l) => x * (l.odds || 1), 1);
+    const prob = legs.reduce((x, l) => x * (l.prob || 0), 1);
+    return { legs, size: legs.length, odds, prob, fairOdds: prob > 0 ? 1 / prob : null, value: odds * prob - 1, estimated: legs.some((l) => l.estimated) };
+  }
+
+  /**
+   * The High Banker across two copies of the day: a banker whose match has kicked off keeps the
+   * version published before kick-off; the morning slip is frozen once one of its legs starts,
+   * and a newer slip for the matches still to play sits beside it.
+   */
+  function mergeBanker(a, b, startedOf) {
+    if (!a) return b || null;
+    if (!b) return a;
+    const started = (l) => startedOf(String(l.fixtureId), { match: { date: l.kickoff } });
+    const sig = (sl) => (sl ? sl.legs.map((l) => l.fixtureId + l.key).join(',') : '');
+    const map = new Map();
+    for (const l of a.bankers || []) if (started(l)) map.set(String(l.fixtureId), l);
+    for (const l of b.bankers || []) if (!map.has(String(l.fixtureId))) map.set(String(l.fixtureId), l);
+    const bankers = [...map.values()].sort((x, y) => (y.score || 0) - (x.score || 0));
+    const out = { ...b, bankers, all: bankers.length ? combineLegs(bankers) : null };
+    if (a.slip && a.slip.legs.some(started)) {
+      out.slip = a.slip;
+      out.bigger = a.bigger || [];
+      out.reached = true;
+      out.frozen = true;
+      out.later = b.slip && !b.slip.legs.some(started) && sig(b.slip) !== sig(a.slip) ? { slip: b.slip, bigger: b.bigger || [] } : null;
+    }
+    return out;
   }
 
   // ---------------------------------------------------------------- results
@@ -303,6 +338,30 @@
       if (acc.later) accOutcome(acc.later);
     };
     accOutcome(payload.accumulator);
+    // the High Banker: every banker and every slip, ticked or crossed
+    S.banker = tally();
+    const bk = payload.banker;
+    if (bk) {
+      const legOut = (l) => {
+        const f = fx.get(String(l.fixtureId)) || { state: Date.parse(l.kickoff) <= (now || Date.now()) ? 'in' : 'pre' };
+        l.outcome = outcomeOf(l.key, { state: f.state, home: f.home || {}, away: f.away || {} });
+        return l.outcome;
+      };
+      const slipOut = (sl) => {
+        if (!sl || !sl.legs) return;
+        const os = sl.legs.map(legOut);
+        const lost = os.some((o) => o && o.final && o.hit === 0);
+        const done = os.every((o) => o && o.final);
+        sl.outcome = lost ? 'lost' : done ? (os.some((o) => o.hit === 1) ? 'won' : 'void') : os.some((o) => o) ? 'live' : 'pending';
+      };
+      for (const l of bk.bankers || []) add(S.banker, legOut(l));
+      slipOut(bk.slip);
+      for (const o of bk.bigger || []) slipOut(o);
+      if (bk.later) {
+        slipOut(bk.later.slip);
+        for (const o of bk.later.bigger || []) slipOut(o);
+      }
+    }
     let finished = 0;
     let live = 0;
     let upcoming = 0;
@@ -347,5 +406,5 @@
     return { ...newer, earlier };
   }
 
-  return { RESET, dayKey, msToReset, zoned, settle, fixturesFrom, fixtureMap, mergePredictions, attachResults, mergeStrongest, outcomeOf, outcomeGeneral, predictedPreMatch };
+  return { RESET, dayKey, msToReset, zoned, settle, fixturesFrom, fixtureMap, mergePredictions, mergeBanker, combineLegs, attachResults, mergeStrongest, outcomeOf, outcomeGeneral, predictedPreMatch };
 });

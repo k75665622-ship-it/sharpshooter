@@ -20,6 +20,46 @@ See [`methodology/GENERAL-PREDICTION-v6.md`](methodology/GENERAL-PREDICTION-v6.m
 
 ---
 
+## High Banker — the day's safest picks, 3.0+ odds
+
+The **High Banker** tab takes only selections that pass **every one of seven checks**, then builds the
+**most likely slip that reaches 3.0 odds** from them. There is no fixed number of legs and no upper limit:
+the tab also shows the most likely slips at **5+, 10+ and 20+** when the day's bankers reach them, and lists
+every banker. When the bankers cannot reach 3.0 there is **no slip** — weaker picks are never added to make up
+the odds.
+
+| # | Check | What it asks |
+|---|---|---|
+| 1 | Data | a real bookmaker price, most of the 184 factors measurable, 10+ archived games for each team, a league match (not a cup tie) |
+| 2 | Strength | the v6 model rates it at least **74%** AND the bookmakers' own margin-free price at least **72%** |
+| 3 | No trap | the factors do not rate it below the price, it is not on the match's avoid list, no confirmed trap rule fires |
+| 4 | Agrees | it is the normal prediction's main pick or a safer form of it — never a contradiction |
+| 5 | Trends | no red flag: form slump, opponent on fire, poor venue form, bogey head-to-head, draw-heavy meetings, Elo doubting the price, both sides failing to score, low- or high-scoring trends against it, or a measured pattern against it |
+| 6 | Price | it pays 1.15–1.60 (shorter legs add risk faster than they add odds) |
+| 7 | Live | not kicked off, no confirmed absence on the side it depends on, price not drifting 8%+ against it |
+
+A banker that also qualifies under one of the market methodologies is marked **★ Methodology** (triple-confirmed).
+Each leg shows its checks, the model and bookmaker probabilities, and a "why it is a banker" list; picks that
+looked strong but failed a check are listed with the reason.
+
+**Measured, not promised.** The rule (`lib/banker.js`) was run over **76,528 priced matches** with models trained
+only on 2005-19 (`research/v6/banker_dump.js`, `banker_study.js`). Every threshold was chosen on 2019-23; the
+2023-26 seasons were then measured once:
+
+| Held-out 2023-26 | Result | Stated |
+|---|---|---|
+| Banker legs | **77.8%** won (12,121 legs, ~13 a day) | 77.6% |
+| 3.0+ slips | **33.6%** landed (547 slips, 5.0 legs, average odds 3.04) | 30.5% |
+| Days with a 3.0+ slip | 58% | — |
+| 5+ / 10+ / 20+ slips | 18.1% / 8.4% / 5.0% landed | 17.6% / 8.3% / 3.9% |
+
+A 3.0-odds slip is roughly a 1-in-3 shot even when every leg is a banker — odds always tell the truth about the
+chance. Stricter bars were tested: 85%-sure legs need 6-7 per slip, so the slip lands no more often and exists on
+far fewer days. Requiring agreement with the normal prediction is what lifts the slips above their stated chance
+(2019-23: without it slips landed 31.9% against 32.7% stated; with it 36.1% against 31.7%), and the red-flag checks
+widen that margin (from +1.7 to +4.4 points). Every banker and every slip is written to the track record before
+kick-off (`High Banker` rows) and settled afterwards.
+
 ## Strongest Picks
 
 The **Strongest Picks** tab lists the picks every independent view agrees on, one per match, with **no fixed
@@ -587,6 +627,7 @@ the distortion but does not eliminate the extra uncertainty.
 | `GET /api/methodology`                   | The thirteen methodologies, thresholds, and the v4-vs-v5 backtest record |
 | `GET /api/ledger`                        | Track record of recorded pre-match predictions (settles finished games; `?format=csv` to download) |
 | `GET /api/accumulator?date=`             | v6 double-confirmed accumulator: legs, best 2-5 folds, take-at prices, measured record |
+| `GET /api/banker?date=`                  | High Banker: every banker with its seven checks, the most likely 3.0+ slip, bigger 5+/10+/20+ slips, near misses, measured record |
 | `GET /api/crawler`                       | v6 crawler status per source (requests, cache hits, 304s, stale serves, robots, pauses) |
 | `GET /api/intel-research`                | v6 research record: decision backtest, accumulator backtest, factor importance, pattern verdicts |
 | `GET /api/bankers?date=&limit=`          | Legacy banker election (superseded)           |
