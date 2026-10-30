@@ -173,13 +173,19 @@ which won exactly their stated 86.3%: neutral, kept as the requested check.
 
 **Contexts** (`strongest_context.js`: league tier, time of season, favourite strength, expected goals, home/away).
 Nearly every market held its measured chance in every context. The one consistent weak spot is **team under 1.5
-goals** at the top of the range: selections at 84%+ won 1.2-1.9 points less than stated on 2019-23 and 2.5-3.5 less
-on 2023-26, worst against a heavy favourite (75%+: −2.3 and −3.5) — underdogs reach two goals more often than the
-numbers say. The exclusion rule declared before the check (−1.5 or worse on 2019-23 with 1,000+ selections) does not
-remove it (home side −1.9 on 688, away side −1.2 on 1,671), and loosening it after seeing 2023-26 would be tuning on
-the held-out seasons, so it stays on the list with its record shown on the page and quoted in each such pick's
-reasons (held-out picks: 83.5% won, 86.4% stated, 291 picks — 1.6% of the list). Over 1.5 goals with a heavy
+goals** at the top of the range. In the pick band (84%+ measured, bookmakers at 88% or less) it won less than stated
+in both periods: 2019-23 −0.9 points when the opponent was a 75%+ favourite (592 selections) and −1.6 otherwise
+(1,767); 2023-26 −4.4 (490) and −1.7 (780). It did not meet the exclusion rule declared before the held-out check
+(−1.5 or worse on 2019-23 with 1,000+ selections: the family pooled −1.4), and the held-out picks of it won 83.5%
+against 86.4% stated (291). **At the site owner's request it was then kept off the list** (`config.excluded`); it
+stays on the match cards. Because that choice was made after seeing 2023-26, its share of the record below is not a
+clean out-of-sample test — it moves little either way (about 160 of 18,470 held-out picks). Over 1.5 goals with a heavy
 favourite went the other way (+3.1 / +3.7).
+
+**Final rule (with team under 1.5 kept off), same replay:** 2019-23: 28,824 picks, 86.9% won (stated 86.7%);
+**2023-26: 18,309 picks (63% of matches, ~19 a match day), 86.4% won (stated 86.7%)** — Elite 87.6% (88.0%), Strong
+85.5% (85.6%), corners 86.9% (87.0%), bookings 86.7% (87.0%). This is the record `lib/strongest/models.json` carries
+for the page.
 
 **The High Banker** (`banker_pace.js`, 2019-23): measured chances as leg probabilities lowered the 3.0+ slip's
 landing rate (36.1% → 33.0%), and the possession check lowered it further (30.8-33.1%), so neither is used. A safer
