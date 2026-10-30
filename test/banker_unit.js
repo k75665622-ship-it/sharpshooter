@@ -113,6 +113,18 @@ ok(out.bigger.length >= 1 && out.bigger.every((o, i, a) => o.odds >= o.target &&
 ok(out.near.some((l) => l.fixtureId === '999') === false, 'a match under the strength bar is not a near miss');
 const two = BK.build(day.slice(0, 2), cfg);
 ok(!two.slip && !two.reached && two.bankers.length === 2 && two.bigger.length === 0, 'two bankers cannot reach 3.0: no slip, nothing padded');
+// the safer slip: the same bankers, the most likely way to the smaller target
+ok(out.safer && out.safer.target === cfg.safer && out.safer.odds >= cfg.safer, `safer slip reaches ${cfg.safer} (${out.safer && out.safer.odds.toFixed(2)})`);
+ok(out.safer.size < out.slip.size && out.safer.prob > out.slip.prob, `the safer slip has fewer legs and a bigger chance (${out.safer.size} legs ${(out.safer.prob * 100).toFixed(0)}% vs ${out.slip.size} legs ${(out.slip.prob * 100).toFixed(0)}%)`);
+ok(out.safer.legs.every((l) => out.bankers.some((b) => b.fixtureId === l.fixtureId && b.key === l.key)), 'the safer slip uses only the day\'s bankers');
+ok(two.safer && two.safer.odds >= cfg.safer || (two.all && two.all.odds < cfg.safer), 'two bankers can still make a safer slip when they reach its target');
+ok(BK.build([], cfg).safer === null, 'no bankers -> no safer slip');
+// the measured-chance and possession switches (off in production: research/v6/banker_pace.js)
+const sw = input({ id: '55', mc: { '1X': 0.7 }, pv: { '1X': 0.7 }, mv: { '1X': 0.84 } });
+ok(BK.forMatch(sw, cfg).best && BK.forMatch(sw, cfg).best.key === '1X', 'switches off: the v6 probability decides, the possession view is ignored');
+ok(BK.check(sw, '1X', { ...cfg, useMeasured: true }).failed === 'strength', 'useMeasured: the measured chance decides the strength check');
+ok(BK.check(sw, '1X', { ...cfg, paceGap: 0.05 }).failed === 'possession', 'paceGap: the possession model rating it well below the price fails the leg');
+ok(BK.check(input(), '1X', { ...cfg, paceGap: 0.05 }).pass, 'paceGap: no possession data -> the check passes (not used)');
 const nearDay = BK.build([input({ id: '7', f: { a_ppg5: 2.6, h_ftsr: 0.5 } })], cfg); // the opponent on fire AND Home often blank
 ok(nearDay.near.length === 1 && nearDay.near[0].failed === 'trends', 'a strong pick failing a check is listed as a near miss with the reason');
 
@@ -150,7 +162,7 @@ ok(mg.summary.banker.won === 1, 'banker tally in the day summary');
 // ---- ledger: singles + the slip recorded before kick-off, never overwritten
 const L1 = BK.build(day, cfg);
 const added = LEDGER.recordBanker(L1, new Date().toISOString().slice(0, 10));
-ok(added >= L1.bankers.length + 1, `bankers and slip recorded (${added})`);
+ok(added >= L1.bankers.length + 2, `bankers, the slip and the safer slip recorded (${added})`);
 ok(LEDGER.recordBanker(L1, new Date().toISOString().slice(0, 10)) === 0, 'nothing overwritten on a second publish');
 const all = LEDGER.all();
 ok(all.some((e) => e.kind === 'acca' && e.method === 'banker' && e.legs.length === L1.slip.size) && all.filter((e) => e.kind === 'banker').length === L1.bankers.length, 'ledger holds the slip and each banker');
@@ -162,5 +174,6 @@ const R = require('../lib/banker_record.json');
 ok(Math.abs(R.heldOut.legs.hit - R.heldOut.legs.stated) < 0.02 && R.heldOut.legs.n > 5000, 'held-out legs calibrated');
 ok(R.heldOut.slip.slips > 300 && R.heldOut.slip.hit >= R.heldOut.slip.stated - 0.03, 'held-out slips land at least as often as stated');
 ok(R.config.minProb === cfg.minProb && R.config.target === cfg.target, 'record matches the production settings');
+ok(R.heldOut.safer && R.heldOut.safer.slips > 300 && R.heldOut.safer.hit > R.heldOut.slip.hit, 'held-out: the safer slip lands more often than the 3.0+ slip');
 
 console.log(`banker_unit: ${n} checks passed`);

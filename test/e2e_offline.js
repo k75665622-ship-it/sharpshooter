@@ -340,11 +340,14 @@ global.fetch = async (input, init) => {
     const GROUPS9 = 'Goals,Corners,Half,Players,Minutes,Team,Match,Bookings,Special';
     t('strongest: both fixtures priced', sp.counts && sp.counts.priced === 2, JSON.stringify(sp.counts || sp.error));
     t('strongest: every match card has the nine SportyBet groups in order', (sp.matches || []).length === 2 && sp.matches.every((m) => m.cards.map((c) => c.group).join(',') === GROUPS9));
-    t('strongest: three independent goal views (market, stats, v6 factors)', sp.matches.every((m) => m.data.views.join(',') === 'market,stats,factors'), JSON.stringify(sp.matches.map((m) => m.data.views)));
+    t('strongest: four goal views (market, stats, v6 factors, possession model)', sp.matches.every((m) => m.data.views.join(',') === 'market,stats,factors,pace'), JSON.stringify(sp.matches.map((m) => m.data.views)));
+    t('strongest: the possession model reads shots and finishing from the archive', sp.matches.every((m) => m.expectedGoals.pace && m.expectedGoals.pace.total > 0.8 && m.expectedGoals.pace.total < 5), JSON.stringify(sp.matches.map((m) => m.expectedGoals.pace)));
     t('strongest: corners and bookings priced from the crawled archive', sp.matches.every((m) => m.data.corners && m.data.bookings));
     t('strongest: first-half share measured from the archive half-times', sp.matches.every((m) => m.data.firstHalfShare > 0.38 && m.data.firstHalfShare < 0.5), JSON.stringify(sp.matches.map((m) => m.data.firstHalfShare)));
     const spBar = (p) => (p.kind === 'corners' || p.kind === 'cards' ? sp.config.floorStatsOnly : sp.config.floor);
-    t('strongest: every pick clears the bar in every view and still pays', (sp.picks || []).every((p) => Object.values(p.pick.views).every((v) => v >= spBar(p.pick) - 1e-9) && p.pick.prob <= sp.config.maxProb), JSON.stringify((sp.picks || []).map((p) => p.pick.views)));
+    const spPay = (p) => (p.kind === 'corners' || p.kind === 'cards' || p.views.market == null ? p.prob : p.views.market);
+    const spNeed = (p) => (p.kind === 'corners' || p.kind === 'cards' ? sp.config.minChanceStatsOnly : sp.config.minChance);
+    t('strongest: every pick is measured, clears its chance bar and every view, and still pays', (sp.picks || []).every((p) => p.pick.measured && p.pick.prob >= spNeed(p.pick) - 1e-9 && Object.values(p.pick.views).every((v) => v >= spBar(p.pick) - 1e-9) && spPay(p.pick) <= sp.config.maxProb + 1e-9), JSON.stringify((sp.picks || []).map((p) => [p.pick.prob, p.pick.views])));
     t('strongest: at most one pick per match, no fixed count', new Set(sp.picks.map((p) => p.match.id)).size === sp.picks.length && sp.picks.length <= 2);
     t('strongest: picks carry reasons, checks and a take-at price', sp.picks.every((p) => p.pick.reasons.length >= 2 && /%/.test(p.pick.checks) && p.pick.takeAt >= 1.05));
     t('strongest: reasons quote real numbers, never undefined / NaN', sp.matches.every((m) => m.cards.every((c) => c.none || (c.reasons || []).every((r) => !/undefined|NaN/.test(r)))));

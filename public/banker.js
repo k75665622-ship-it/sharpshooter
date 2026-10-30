@@ -98,9 +98,24 @@
         <div><b>${dec(h.slip.avgOdds)}</b><span>average slip odds<br><small>${dec(h.slip.avgLegs, 1)} legs on average</small></span></div>
         <div><b>${pct(h.slip.coverage, 0)}</b><span>of days had a 3.0+ slip<br><small>the rest: not enough bankers</small></span></div>
       </div>
+      ${h.safer ? `<div class="muted-t">Safer ${dec(h.safer.target || 2, 1)}+ slips, same test: <b>${pct(h.safer.hit, 1)}</b> landed (stated ${pct(h.safer.stated, 1)}, ${dec(h.safer.avgLegs, 1)} legs, average odds ${dec(h.safer.avgOdds)}). Fewer legs, fewer things to go wrong.</div>` : ''}
       <div class="muted-t">Bigger slips, same test: ${Object.entries(h.bigger || {}).map(([t, g]) => `${t}+ landed ${pct(g.hit, 1)} (stated ${pct(g.stated, 1)}, ${dec(g.avgLegs, 0)} legs)`).join(' · ')}.</div>
       <div class="muted-t">Same rule on the 2019–23 seasons used to set it: bankers ${pct(t.legs.hit, 1)} (stated ${pct(t.legs.stated, 1)}), slips ${pct(t.slip.hit, 1)} (stated ${pct(t.slip.stated, 1)}). ${h.slip.fullyPriced && h.slip.fullyPriced.n ? `Slips with a real price on every leg (${h.slip.fullyPriced.n.toLocaleString()}): landed ${pct(h.slip.fullyPriced.hit, 1)}, return at the best price ${signed(h.slip.fullyPriced.roiBest * 100, 1)}%, at Bet365 ${signed(h.slip.fullyPriced.roiBet365 * 100, 1)}%.` : ''}</div>
     </div>`;
+  }
+
+  /** The safer slip: the same bankers, the most likely way to the smaller target. */
+  function saferBlock(b, target) {
+    const sl = b.safer;
+    if (!sl || !sl.legs || !sl.legs.length) return '';
+    const t = sl.target || (b.config && b.config.safer) || 2;
+    const h = b.record && b.record.heldOut;
+    const sf = h && h.safer;
+    return `<div class="sec-title bk-sec">Safer slip <span class="pill">${dec(t, 1)}+</span></div>
+      <p class="muted-t bk-near-p">The same bankers, fewer legs. Every leg is one more thing that can go wrong, so a shorter slip lands more often${sf && h.slip
+        ? `: on the seasons the rule never saw, <b>${pct(sf.hit, 1)}</b> of ${dec(t, 1)}+ slips landed against ${pct(h.slip.hit, 1)} of ${dec(target, 1)}+ slips` : ''}.
+        ${b.saferFrozen ? 'Published before its first kick-off and kept unchanged.' : ''}</p>
+      ${slipCard(sl, 'Safer slip', `${sl.size} banker${sl.size === 1 ? '' : 's'} · the most likely way to ${dec(t, 1)}+ odds today`)}`;
   }
 
   function nearBlock(list) {
@@ -132,7 +147,8 @@
         <p>Only selections that pass <b>every one of seven checks</b> are bankers: the model and the bookmakers' own price both rate it at least
         ${pct(cfg.minProb || 0.78, 0)}/${pct(cfg.minBase || 0.75, 0)}, the factors do not flag it as a bookmaker trap, it agrees with the normal prediction,
         neither team's record raises a red flag, it still pays, and nothing changed before kick-off. The slip is the <b>most likely set of bankers</b> that
-        reaches ${dec(target, 1)} odds. There is no upper limit and no padding: some days give ${dec(target, 1)}, some give far more, some give none.</p>
+        reaches ${dec(target, 1)} odds. There is no upper limit and no padding: some days give ${dec(target, 1)}, some give far more, some give none.
+        A ${dec(target, 1)}+ slip needs about five legs, so on most days one of them lets it down — the <b>safer ${dec(cfg.safer || 2, 1)}+ slip</b> below uses fewer.</p>
         <details class="sp-rules"><summary>The seven checks</summary><ul class="rules">${(b.rules || []).map((r) => `<li>${esc(r)}</li>`).join('')}</ul></details>
         ${recordBlock(b.record)}
       </div>
@@ -142,6 +158,7 @@
         : `<div class="empty bk-empty"><h3>No ${dec(target, 1)}+ High Banker today</h3><p>${bankers.length
           ? `Today's ${bankers.length} banker${bankers.length === 1 ? '' : 's'} reach${bankers.length === 1 ? 'es' : ''} only ${dec(b.all ? b.all.odds : 1)} odds together. Weaker picks are never added to make up the odds — that is the point of a banker. They are listed below.`
           : 'No selection passes every check today. That is the filter doing its job: on days like this the safest bet is no bet.'}</p></div>`}
+      ${saferBlock(b, target)}
       ${b.later && b.later.slip ? `<div class="sec-title bk-sec">For the matches still to play <span class="pill">newer</span></div>${slipCard(b.later.slip, 'Later slip', 'built after the first slip had started')}` : ''}
       ${b.later && b.later.bigger && b.later.bigger.length ? biggerBlock(b.later.bigger, b.record && b.record.heldOut && b.record.heldOut.bigger) : ''}
       ${biggerBlock(b.bigger, b.record && b.record.heldOut && b.record.heldOut.bigger)}

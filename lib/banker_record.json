@@ -3,6 +3,7 @@
  "config": {
   "version": "1.0",
   "target": 3,
+  "safer": 2,
   "bigger": [
    5,
    10,
@@ -156,6 +157,16 @@
     "roiBest": 0.226
    }
   },
+  "safer": {
+   "target": 2,
+   "slips": 1087,
+   "coverage": 0.799,
+   "hit": 0.492,
+   "stated": 0.482,
+   "avgLegs": 3.224,
+   "avgOdds": 2.041,
+   "roi": -0.007
+  },
   "bigger": {
    "5": {
     "slips": 785,
@@ -293,6 +304,16 @@
     "roiBet365": -0.033,
     "roiBest": 0.153
    }
+  },
+  "safer": {
+   "target": 2,
+   "slips": 650,
+   "coverage": 0.688,
+   "hit": 0.489,
+   "stated": 0.469,
+   "avgLegs": 3.162,
+   "avgOdds": 2.039,
+   "roi": -0.01
   },
   "bigger": {
    "5": {
