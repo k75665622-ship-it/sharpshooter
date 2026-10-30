@@ -136,6 +136,7 @@
 /* ---- record ---- */
 .sp-rec { margin-bottom: 8px; }
 .sp-bt .bt-row { grid-template-columns: minmax(0, 2.2fr) repeat(4, minmax(0, .9fr)); }
+.sp-bt.sp-meas .bt-row { grid-template-columns: minmax(0, 2.2fr) repeat(3, minmax(0, .9fr)); }
 .sp-foot { margin-top: 18px; }
 
 @media (max-width: 700px) {
@@ -154,5 +155,7 @@
   .sp-row-lv { font-size: 0; gap: 0; }
   .sp-bt .bt-row { grid-template-columns: minmax(0, 1.6fr) .7fr .9fr; }
   .sp-bt .bt-row > span:nth-child(n+4) { display: none; }
+  .sp-bt.sp-meas .bt-row { grid-template-columns: minmax(0, 1.6fr) .7fr .8fr .8fr; }
+  .sp-bt.sp-meas .bt-row > span:nth-child(4) { display: block; }
 }
 @media (prefers-reduced-motion: reduce) { .sp-pick, .sp-mc { transition: none; } }

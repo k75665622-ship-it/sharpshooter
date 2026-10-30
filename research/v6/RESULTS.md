@@ -100,3 +100,88 @@ why the site recommends the biggest accumulator that still has at least a 40% ch
 
 Requiring the normal prediction's single **main pick** only (instead of its calls) left legs capped near 77% and
 made worse accumulators (doubles 53.9%, −12.0% at Bet365); that variant was rejected.
+
+## 7. Strongest Picks v2: measured chances, form + price corners, and the possession model
+
+`strongest_study.js` replays the **production** Strongest Picks code (`lib/strongest`, `lib/pace.js`) on all
+76,528 priced matches from July 2019, walk-forward; every selection is settled on the real result (goals, halves,
+corners, cards). On the 18 divisions where `research/build_states.js` rebuilds the site's own model-only view, the
+goal views are exactly the engine's (calibrated ensemble, model-only witness, v6), with the calibration fitted on
+2019-23 only.
+
+**The old rule (v1), held-out 2023-26** — 29,191 matches:
+
+| | Picks | Won | Stated |
+|---|---|---|---|
+| All Strongest Picks (97% of matches, ~31 a match day) | 28,361 | 84.1% | 84.5% |
+| Team markets (team under 2.5, team to score, ...) | 18,600 | 84.7% | 84.4% |
+| Corners | 2,366 | **79.3%** | 85.5% |
+| Bookings | 2,091 | **82.4%** | 85.6% |
+
+Goal picks were honest; corners and bookings, priced from form alone, were not (team corners −6.1 points, total
+corners under −7.5, cards under −5.2), and a pick on nearly every match meant several losers every day.
+
+**The possession model on its own** (`lib/pace.js`: average(own shots, opponent's shots conceded) × average(own goals
+per shot, opponent's goals per shot allowed) — the NBA "efficiency × possessions" total, in football), log-loss on
+the same matches (lower is better):
+
+| Held-out 2023-26 | 1X2 | Over 2.5 | BTTS |
+|---|---|---|---|
+| Bookmakers | **0.9959** | 0.6755 | **0.6847** |
+| v6 factors | **0.9954** | **0.6753** | 0.6853 |
+| Stats view (ratings, xG proxy, Elo) | 1.0129 | 0.6811 | 0.6867 |
+| Possession model | 1.0390 | 0.6862 | 0.6883 |
+
+**The measured chance** (`strongest_fit.js`): per market, logit(chance) = a + b·logit(market) + c·(factors − market)
++ d·(stats − market) [+ e·(possession − market)], fitted on 2019-23. The v6 factors' disagreement with the price is
+worth about 40% of its size (c ≈ 0.3-0.5); the form-only stats view's disagreement is **negative in every market**
+(d < 0): when form disagrees with the bookmakers, the bookmakers are right more often. The possession term improved
+the 2019-23 log-loss by 0.0001 per selection — under the 0.0005 a view must earn — so it is not used for goal
+chances (held-out: 0.5465 with or without it).
+
+**Corners and cards** (Poisson regression, negative-binomial dispersion; log-loss of the count):
+
+| Held-out 2023-26 | Corners | Cards |
+|---|---|---|
+| Site's season view (form only) | 2.6352 | 2.1915 |
+| Site's last-6 view (form only) | 2.6474 | 2.1939 |
+| Form + price | 2.6280 | **2.1736** |
+| Form + price + possession (shot volume) | **2.6272** | 2.1737 |
+
+The bookmakers' strength gap is the largest single corner term (0.22), and with the possession model in, the
+opponent's shots conceded is the next (0.20): a side facing a team that lets opponents shoot wins more corners.
+Possession earned its place for corners (2019-23 gain 0.0006) but not for cards. Calibrated by family, the
+held-out corner lines at 85%+ won 88.5% (team corners) where the old views claiming 89% won 83%.
+
+**The bars** (`strongest_report.js --sim`, 2019-23 only): every chance bar from 75% to 84% was honest, so the bar
+sets how strong the list is — 75%: 85.3% won (stated 84.9%), 34 a match day; 84%: 86.9% (86.7%), 22 a match day.
+Production uses 84% (86% for corners and bookings). Requiring the possession model to agree removed 3% of picks,
+which won exactly their stated 86.3%: neutral, kept as the requested check.
+
+**The new rule (v2), held-out 2023-26 — reported once**, models fitted on 2019-23:
+
+| | Picks | Won | Stated |
+|---|---|---|---|
+| All Strongest Picks (63% of matches, ~20 a match day) | 18,470 | **86.4%** | 86.7% |
+| Elite (87%+) / Strong (84%+) | 8,197 / 10,273 | 87.5% / 85.4% | 88.0% / 85.6% |
+| Team markets | 13,240 | 86.3% | 86.7% |
+| Corners | 671 | **87.0%** | 87.0% |
+| Bookings | 838 | **86.5%** | 87.0% |
+| Matches on the 18 rebuilt divisions / elsewhere | 13,281 / 5,189 | 86.5% / 85.9% | 86.7% / 86.6% |
+
+`lib/strongest/models.json` is then refitted on every season with the same variants (`FORCE_*`).
+
+**Contexts** (`strongest_context.js`: league tier, time of season, favourite strength, expected goals, home/away).
+Nearly every market held its measured chance in every context. The one consistent weak spot is **team under 1.5
+goals** at the top of the range: selections at 84%+ won 1.2-1.9 points less than stated on 2019-23 and 2.5-3.5 less
+on 2023-26, worst against a heavy favourite (75%+: −2.3 and −3.5) — underdogs reach two goals more often than the
+numbers say. The exclusion rule declared before the check (−1.5 or worse on 2019-23 with 1,000+ selections) does not
+remove it (home side −1.9 on 688, away side −1.2 on 1,671), and loosening it after seeing 2023-26 would be tuning on
+the held-out seasons, so it stays on the list with its record shown on the page and quoted in each such pick's
+reasons (held-out picks: 83.5% won, 86.4% stated, 291 picks — 1.6% of the list). Over 1.5 goals with a heavy
+favourite went the other way (+3.1 / +3.7).
+
+**The High Banker** (`banker_pace.js`, 2019-23): measured chances as leg probabilities lowered the 3.0+ slip's
+landing rate (36.1% → 33.0%), and the possession check lowered it further (30.8-33.1%), so neither is used. A safer
+2.0+ slip from the same bankers lands far more often — 2019-23: 49.2% (stated 48.2%, 3.2 legs); **held-out 48.9%**
+(stated 46.9%, 650 slips) against 33.6% for the 3.0+ slip — at a lower return (−1.0% against +0.8% held-out).

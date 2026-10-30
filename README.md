@@ -51,10 +51,19 @@ only on 2005-19 (`research/v6/banker_dump.js`, `banker_study.js`). Every thresho
 | Banker legs | **77.8%** won (12,121 legs, ~13 a day) | 77.6% |
 | 3.0+ slips | **33.6%** landed (547 slips, 5.0 legs, average odds 3.04) | 30.5% |
 | Days with a 3.0+ slip | 58% | — |
+| **Safer 2.0+ slips** | **48.9%** landed (650 slips, 3.2 legs, average odds 2.04) | 46.9% |
 | 5+ / 10+ / 20+ slips | 18.1% / 8.4% / 5.0% landed | 17.6% / 8.3% / 3.9% |
 
 A 3.0-odds slip is roughly a 1-in-3 shot even when every leg is a banker — odds always tell the truth about the
-chance. Stricter bars were tested: 85%-sure legs need 6-7 per slip, so the slip lands no more often and exists on
+chance. With about five legs, one of them lets the slip down on most days, so the tab also builds the **safer
+slip**: the most likely set of the same bankers reaching **2.0+** (about three legs). It lands about half the days
+(2019-23: 49.2%; held-out 48.9%) against a third for the 3.0+ slip, at a smaller price — over many days the 3.0+ slip
+returned more (2019-23: +8.6% against −0.7%), so both are shown and the choice is yours.
+
+Two further ideas were tested on 2019-23 and **left out** because they made the slips worse
+(`research/v6/banker_pace.js`): ranking legs by the Strongest Picks' measured chance (slips landed 33.0% against
+36.1%) and a possession-model check that drops legs the teams' shots and finishing do not back (30.8–33.1%). Both
+remain switches in `lib/banker.js` (`useMeasured`, `paceGap`), off. Stricter bars were tested: 85%-sure legs need 6-7 per slip, so the slip lands no more often and exists on
 far fewer days. Requiring agreement with the normal prediction is what lifts the slips above their stated chance
 (2019-23: without it slips landed 31.9% against 32.7% stated; with it 36.1% against 31.7%), and the red-flag checks
 widen that margin (from +1.7 to +4.4 points). Every banker and every slip is written to the track record before
@@ -62,31 +71,58 @@ kick-off (`High Banker` rows) and settled afterwards.
 
 ## Strongest Picks
 
-The **Strongest Picks** tab lists the picks every independent view agrees on, one per match, with **no fixed
-number**: a weak day gives none, a strong day can give twelve.
+The **Strongest Picks** tab lists, one per match, the selections with the highest **measured** chance that every
+independent view agrees on. There is **no fixed number**: a weak day gives few picks.
 
 Every fixture is priced across SportyBet's nine market groups — **Goals, Corners, Half, Players, Minutes, Team,
-Match, Bookings, Special** — and every selection is priced by several views that do not share their inputs:
+Match, Bookings, Special** — by views that do not share their inputs:
 
 | Markets | Views |
 |---|---|
-| Goals, Half, Minutes, Team, Match, Special | **Market** (the site's ensemble: de-vigged multi-book price 90% + model 10%, calibrated) · **Stats** (verified-results ratings, ESPN xG and ClubElo, no price) · **v6 factors** (170 measured factors on top of the price) |
-| Corners, Bookings | **Season** (last 20 league games, home/away split, shrunk to the league average) · **Last 6** games — from the football-data.co.uk archive: corners won/conceded, cards, the league's dispersion, the referee's card rate (England/Scotland), head-to-head |
-| Players | team expected goals from the market and stats views × the player's share — Fantasy Premier League xG (Premier League) or ESPN's top scorers (every other league), with the line-up once ESPN publishes it |
+| Goals, Half, Minutes, Team, Match, Special | **Market** (the site's ensemble: de-vigged multi-book price 90% + model 10%, calibrated) · **Stats** (verified-results ratings, ESPN xG and ClubElo, no price) · **v6 factors** (170 measured factors on top of the price) · **Possession** (`lib/pace.js`, below) |
+| Corners, Bookings | **Form + price** (the teams' corner / card form, the bookmakers' strength gap and expected goals, and — for corners — the possession model's shot volume; fitted on 2019-23) · **Season** (last 20 league games, home/away split) · **Last 6** — from the football-data.co.uk archive, plus the referee's card rate (England/Scotland) and head-to-head |
+| Players | team expected goals from the market and stats views × the player's share — Fantasy Premier League xG (Premier League) or ESPN's top scorers |
 
-Half-time markets use each league's **measured** first-half goal share (football-data half-time scores). Minute
-markets split it the way goals fall in large samples (about 13% of goals in minutes 1-15, 28% in 1-30).
+**The possession model** is football's version of the NBA total formula *points = offensive efficiency ×
+possessions per game*. A football "possession that got somewhere" is a shot, and efficiency is goals per shot:
+each side's expected goals = average(its shots a game, the shots its opponent concedes) × average(its goals per
+shot, the goals per shot its opponent allows), each against the league at that venue, from the last 20 league
+games and shrunk toward the league so a lucky run cannot run away. Measured on 2023-26 matches it never saw, it is
+**weaker than the bookmakers on its own** (1X2 log-loss 1.039 against 0.996) and adds nothing to the goal-market
+chances once the price is known — when it disagrees with the price, the price is usually right. It **does** help
+corners (sides that take more shots, and opponents that concede more, mean more corners), so it is part of the corner
+model; for goal picks it is one of the views that must agree, and every pick explains the teams' shots and finishing.
 
-**A pick qualifies when:** every view rates it at least **75%** (corners and bookings, which have no bookmaker price
-on free data: **80%** from both views); it still pays at least **1.14** at fair odds; goal picks are anchored by a real
-bookmaker price; the v6 layer does not flag it as a trap or as overrated by the price; and no serious team news hits
-the side it backs. Scorer picks are never on the list (they hang on the line-up). Strength is the **lowest** view:
-**Elite** 85%+, **Strong** 80%+, **Solid** 75%+. Every number lives in [`lib/strongest/config.js`](lib/strongest/config.js).
+**The chance shown is measured** (`lib/strongest/calibrate.js`, `lib/strongest/models.json`): what selections like
+it actually won on past matches, given what each view said — a per-market calibration fitted on 2019-23. Two things
+it learned: the v6 factors' disagreement with the price is real but worth about 40% of its size, and a form-only
+view that disagrees with the bookmakers is on the **wrong** side of them in every market measured.
 
-Each pick comes with the facts behind it (prices, expected goals, last-10 form at its own line, head-to-head, table,
-referee, players, team news) and its caveats. The tab also shows every match's nine-market card, near misses, the
-chance of combining the top picks, and a **track record**: every pick is written down before kick-off (data/strongest)
-and settled from ESPN results and the football-data archive (half-time, corners, cards). Nothing is edited afterwards.
+**A pick qualifies when:** its measured chance is at least **84%** (**86%** for corners and bookings, which have no
+bookmaker price of their own and are only priced when the bookmakers' read of the match exists); every view rates it at
+least **75%**; the bookmakers' own probability is at most **88%** (it still pays 1.14+); the v6 layer does not flag it
+as a trap or overrated by the price; no serious team news hits the side it backs; and the market has a measured record
+(minute markets and scorers do not, so they stay on the match cards only). Strength is the measured chance: **Elite**
+87%+, **Strong** 84%+. Every number lives in [`lib/strongest/config.js`](lib/strongest/config.js).
+
+**Measured, not promised.** The rule was replayed with the production code on all 76,528 priced matches from July
+2019 (`research/v6/strongest_study.js`), models and bars chosen on 2019-23 and the 2023-26 seasons measured once:
+
+| Held-out 2023-26 (29,191 matches) | Old rule (v1) | **New rule (v2)** |
+|---|---|---|
+| Strongest Picks | 28,361 — 97% of matches, ~31 a match day | **18,470 — 63% of matches, ~20 a match day** |
+| Won (stated) | 84.1% (84.5%) | **86.4% (86.7%)** |
+| Corners | 79.3% (85.5%) — form alone overrated them | **87.0% (87.0%)** |
+| Bookings | 82.4% (85.6%) | **86.5% (87.0%)** |
+| Elite / Strong | — | 87.5% (88.0%) / 85.4% (85.6%) |
+
+Even at 86%, about one pick in seven loses: a strong pick is not a certain one, and the page says so.
+
+Each pick comes with the facts behind it (its measured record, prices, expected goals from every view, the possession
+model's shots and finishing, last-10 form at its own line, head-to-head, table, referee, players, team news) and its
+caveats. The tab also shows every match's nine-market card, near misses, the chance of combining the top picks, the
+measured record above, and a **live track record**: every pick is written down before kick-off (data/strongest) and
+settled from ESPN results and the football-data archive. Nothing is edited afterwards.
 
 | Endpoint | Purpose |
 |---|---|
@@ -665,7 +701,10 @@ sharpshooter/
 │   ├── intel/          v6 normal prediction: predict, decision, rules (patterns), explain, accumulator
 │   ├── methodology/    core framework + the thirteen market methodologies
 │   ├── strongest/      Strongest Picks: config, inputs (archive, players, line-ups), markets (nine groups),
+│   │                   calibrate + models.json (measured chances, form + price corners and cards),
 │   │                   picks (rules), reasons, record (track record), index (the day)
+│   ├── pace.js         the possession model: shots a game x goals per shot (Strongest Picks, v6 report)
+│   ├── banker.js       the High Banker: seven checks, the 3.0+ slip, the safer 2.0+ slip, bigger slips
 │   └── engine.js       orchestration + methodology layer + legacy banker
 ├── METHODOLOGY.md      summary of all thirteen methodologies
 ├── methodology/        full v5 playbooks (one per market)

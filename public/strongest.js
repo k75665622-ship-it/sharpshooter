@@ -9,7 +9,7 @@
 (function () {
   const SP = { data: null, date: null, loading: false, error: null, sort: 'strength', group: 'all', seq: 0 };
   const GROUPS = ['Goals', 'Corners', 'Half', 'Players', 'Minutes', 'Team', 'Match', 'Bookings', 'Special'];
-  const VIEW = { market: 'Market', stats: 'Stats', factors: 'Factors', season: 'Season', recent: 'Last 6' };
+  const VIEW = { market: 'Market', stats: 'Stats', factors: 'Factors', pace: 'Possession', model: 'Form + price', season: 'Season', recent: 'Last 6' };
 
   const tierCls = (t) => (t ? String(t).toLowerCase() : 'none');
   const p0 = (v) => (v == null ? '—' : Math.round(v * 100) + '%');
@@ -87,7 +87,7 @@
       </div>
       <div class="sp-num">
         <div class="sp-prob">${p0(s.prob)}</div>
-        <div class="sp-fair">fair ${dec(s.fair)}</div>
+        <div class="sp-fair">${s.measured ? 'measured chance · ' : ''}fair ${dec(s.fair)}</div>
         <span class="sp-tier t-${tierCls(s.tier)}">${esc(s.tier || '')}</span>
         <div class="sp-price">${priceBit(s)}</div>
       </div>
@@ -110,7 +110,7 @@
   function nearBlock(list) {
     if (!list || !list.length) return '';
     return `<div class="sec-title sp-sec">Near misses <span class="pill">${list.length}</span></div>
-      <p class="muted-t sp-note">Close, but one view stays under the bar. Shown for information; not Strongest Picks.</p>
+      <p class="muted-t sp-note">Close, but the measured chance or one view stays under the bar. Shown for information; not Strongest Picks.</p>
       <div class="sp-near">${list.map((it) => `<button class="sp-nr" data-id="${esc(it.match.id)}" data-league="${esc(it.match.league)}" data-year="${esc(it.match.seasonYear || '')}">
         <span>${esc(fmtTime(it.match.date))}</span><span><b>${esc(it.pick.label)}</b> <small>${esc(it.match.home.name)} v ${esc(it.match.away.name)} · ${esc(it.pick.group)}</small></span>
         <span class="sp-nr-v">${Object.entries(it.pick.views).map(([k, v]) => `${esc(VIEW[k] || k)} ${p0(v)}`).join(' · ')}</span></button>`).join('')}</div>`;
@@ -137,12 +137,28 @@
     </div>`;
   }
 
+  /** The rule's measured record on held-out seasons (lib/strongest/models.json, research/v6). */
+  function measuredBlock(cfg) {
+    const m = cfg && cfg.measured;
+    if (!m || !m.all) return '';
+    const fams = Object.entries(m.families || {}).filter(([, v]) => v.n >= 30).sort((a, b) => b[1].n - a[1].n);
+    return `<div class="sec-title sp-sec">Measured on past matches <span class="pill">${esc(m.window || '')}</span></div>
+      <p class="muted-t sp-note">The same rules replayed on ${(m.matches || 0).toLocaleString('en-GB')} matches the models never saw (${esc(m.window || '')}), every pick settled on the real result${m.perMatchDay != null ? ` — about ${Math.round(m.perMatchDay)} picks a match day` : ''}.
+        A pick at ${p0(m.all.stated)} should win about ${p0(m.all.stated)} — and that is what happened: <b>${pct(m.all.hit, 1)}</b> of ${m.all.n.toLocaleString('en-GB')} won.
+        Even so, roughly ${Math.round((1 - m.all.hit) * 100)} in 100 lose: a strong pick is not a certain one.</p>
+      <div class="bt-table sp-bt sp-meas">
+        <div class="bt-row head"><span>Market</span><span>Picks</span><span>Won</span><span>Stated</span></div>
+        <div class="bt-row"><span><b>All Strongest Picks</b></span><span>${m.all.n.toLocaleString('en-GB')}</span><span><b>${pct(m.all.hit, 1)}</b></span><span>${pct(m.all.stated, 1)}</span></div>
+        ${fams.map(([k, v]) => `<div class="bt-row"><span>${esc(v.label || k)}</span><span>${v.n.toLocaleString('en-GB')}</span><span>${pct(v.hit, 1)}</span><span>${pct(v.stated, 1)}</span></div>`).join('')}
+      </div>`;
+  }
+
   function recordBlock(r, cfg) {
     if (!r) return '';
     const P = r.picks || {};
     const tiers = (cfg.tiers || []).map((t) => {
       const s = (r.byTier || {})[t.name] || {};
-      return `<div class="bt-row"><span><span class="sp-tier t-${tierCls(t.name)}">${esc(t.name)}</span> lowest view ${p0(t.min)}+</span><span>${s.n || 0}</span><span>${s.hitRate == null ? '—' : pct(s.hitRate, 1)}</span><span>${s.stated == null ? '—' : pct(s.stated, 1)}</span><span>${s.pending || 0}</span></div>`;
+      return `<div class="bt-row"><span><span class="sp-tier t-${tierCls(t.name)}">${esc(t.name)}</span> chance ${p0(t.min)}+</span><span>${s.n || 0}</span><span>${s.hitRate == null ? '—' : pct(s.hitRate, 1)}</span><span>${s.stated == null ? '—' : pct(s.stated, 1)}</span><span>${s.pending || 0}</span></div>`;
     }).join('');
     const groups = Object.entries(r.cards || {}).sort((a, b) => GROUPS.indexOf(a[0]) - GROUPS.indexOf(b[0]));
     return `<div class="sec-title sp-sec">Track record <span class="pill">${P.n || 0} settled</span></div>
@@ -188,20 +204,23 @@
     const picks = [...(d.picks || [])];
     if (SP.sort === 'kickoff') picks.sort((a, b) => new Date(a.match.date) - new Date(b.match.date));
     const tierCount = (n) => picks.filter((p) => p.pick.tier === n).length;
+    // the tiers a pick can carry (at or above the list's bar)
+    const listTiers = (cfg.tiers || []).filter((t) => t.min >= (cfg.minChance || 0) - 1e-9);
     const rec = d.record && d.record.picks;
     const upcoming = (d.matches || []).filter((m) => !m.started);
 
     el.innerHTML = `<div class="m-intro sp-intro">
         <div class="sp-kicker">Strongest Picks · ${esc(fmtDateLong(d.date || state.date))}</div>
-        <h2>The picks every view agrees on</h2>
-        <p>Each match is priced across SportyBet's nine markets — Goals, Corners, Half, Players, Minutes, Team, Match, Bookings and Special — by up to three
-        independent views. A pick only makes this list when <b>every view rates it at least ${p0(cfg.floor)}</b>, the bookmakers' price backs it, and nothing flags
-        it as a trap. There is <b>no fixed number</b>: some days give none, some give twelve.</p>
+        <h2>The picks every view agrees on — at a measured chance</h2>
+        <p>Each match is priced across SportyBet's nine markets — Goals, Corners, Half, Players, Minutes, Team, Match, Bookings and Special — by independent views:
+        the bookmakers' price, a stats model, the v6 factors and a <b>possession model</b> (shots a game × goals per shot, for both sides). The chance shown is
+        <b>measured</b>: what picks like it actually won on past matches. A pick makes this list only at <b>${p0(cfg.minChance || 0.8)}+</b>
+        with every view at ${p0(cfg.floor)}+, the bookmakers' price behind it and no trap flagged. There is <b>no fixed number</b>: a weak day gives few picks.</p>
         <details class="sp-rules"><summary>How a pick qualifies</summary><ul class="rules">${(d.rules || []).map((r) => `<li>${esc(r)}</li>`).join('')}</ul></details>
       </div>
       <div class="sumstrip">
         <div class="ss-cell st-lock"><div class="v">${picks.length}</div><div class="k">Strongest Picks</div></div>
-        <div class="ss-cell"><div class="v">${tierCount('Elite')} · ${tierCount('Strong')} · ${tierCount('Solid')}</div><div class="k">Elite · Strong · Solid</div></div>
+        <div class="ss-cell"><div class="v">${listTiers.map((t) => tierCount(t.name)).join(' · ')}</div><div class="k">${listTiers.map((t) => `${esc(t.name)} ${p0(t.min)}+`).join(' · ')}</div></div>
         <div class="ss-cell"><div class="v">${upcoming.length}</div><div class="k">Matches still to play</div></div>
         <div class="ss-cell"><div class="v">${rec && rec.hitRate != null ? pct(rec.hitRate, 0) : '—'}</div><div class="k">${rec && rec.n ? `Record: ${rec.won}/${rec.n} won` : 'Record starts today'}</div></div>
       </div>
@@ -215,7 +234,7 @@
         <div class="sp-list">${picks.map((it, i) => pickCard(it, SP.sort === 'strength' ? i + 1 : null, cfg)).join('')}</div>
         ${combinedStrip(d.combined)}`
       : `<div class="empty sp-empty"><h3>No Strongest Pick ${upcoming.length ? 'yet' : 'today'}</h3>
-          <p>${upcoming.length ? `None of the ${upcoming.length} upcoming matches has a selection that every view rates ${p0(cfg.floor)} or more. That is the filter working: a weak day gives no picks rather than forced ones.` : 'No upcoming matches were analysed for this date.'}</p></div>`}
+          <p>${upcoming.length ? `None of the ${upcoming.length} upcoming matches has a selection with a measured chance of ${p0(cfg.minChance || 0.8)} that every view backs. That is the filter working: a weak day gives no picks rather than forced ones.` : 'No upcoming matches were analysed for this date.'}</p></div>`}
       ${earlierBlock(d.earlier)}
       ${nearBlock(d.nearMisses)}
       ${(d.matches || []).length ? `<div class="sec-title sp-sec">Every match · nine markets <span class="pill">${d.matches.length}</span></div>
@@ -224,6 +243,7 @@
           ${['all', ...GROUPS].map((g) => `<button class="fchip ${SP.group === g ? 'is-active' : ''}" data-group="${esc(g)}">${g === 'all' ? 'All nine' : esc(g)}</button>`).join('')}
         </div>
         <div class="sp-mgrid">${d.matches.map((mt) => matchCard(mt, cfg)).join('')}</div>` : ''}
+      ${measuredBlock(cfg)}
       ${recordBlock(d.record, cfg)}
       <p class="muted-t sp-foot">Probabilities, not guarantees. Fair odds = 100 ÷ chance: only take a price at or above the "take at" figure. 18+. Bet responsibly.</p>`;
 

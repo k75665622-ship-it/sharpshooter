@@ -236,6 +236,11 @@
       out.frozen = true;
       out.later = b.slip && !b.slip.legs.some(started) && sig(b.slip) !== sig(a.slip) ? { slip: b.slip, bigger: b.bigger || [] } : null;
     }
+    // the safer slip is published once too: frozen when its first leg kicks off
+    if (a.safer && a.safer.legs.some(started)) {
+      out.safer = a.safer;
+      out.saferFrozen = true;
+    }
     return out;
   }
 
@@ -356,6 +361,7 @@
       };
       for (const l of bk.bankers || []) add(S.banker, legOut(l));
       slipOut(bk.slip);
+      slipOut(bk.safer);
       for (const o of bk.bigger || []) slipOut(o);
       if (bk.later) {
         slipOut(bk.later.slip);

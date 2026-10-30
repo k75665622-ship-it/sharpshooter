@@ -45,6 +45,7 @@ function evaluate(rows, window, cfg) {
   const L = { n: 0, won: 0, lost: 0, push: 0, stated: 0, byKey: {}, triple: { n: 0, won: 0, stated: 0 }, single: { n: 0, won: 0, stated: 0 }, retRef: 0, nRef: 0, retBest: 0, nBest: 0 };
   const S = { days: 0, daysWith: 0, slips: 0, won: 0, stated: 0, legs: 0, odds: 0, ret: 0, priced: 0, wonPriced: 0, retRef: 0, retBest: 0, oddsHist: {} };
   const A = { n: 0, won: 0, stated: 0, odds: 0 };
+  const SF = { n: 0, won: 0, stated: 0, legs: 0, odds: 0, ret: 0 };
   const BIG = {};
   for (const [, xs] of days) {
     S.days++;
@@ -110,6 +111,17 @@ function evaluate(rows, window, cfg) {
         S.retBest += lost ? -1 : bestOdds - 1;
       }
     }
+    if (out.safer) {
+      SF.n++;
+      const rs = out.safer.legs.map(res);
+      const lost = rs.some((r) => r === 0);
+      const odds = out.safer.legs.reduce((a, l, i) => a * (rs[i] == null ? 1 : l.odds), 1);
+      SF.won += lost ? 0 : 1;
+      SF.stated += out.safer.prob;
+      SF.legs += out.safer.size;
+      SF.odds += out.safer.odds;
+      SF.ret += lost ? -1 : odds - 1;
+    }
     for (const o of out.bigger || []) {
       const g = (BIG[o.target] = BIG[o.target] || { n: 0, won: 0, stated: 0, odds: 0, legs: 0 });
       g.n++;
@@ -142,6 +154,7 @@ function evaluate(rows, window, cfg) {
       roi: r3(S.ret / S.slips), oddsHist: S.oddsHist,
       fullyPriced: { n: S.priced, hit: r3(S.wonPriced / S.priced), roiBet365: r3(S.retRef / S.priced), roiBest: r3(S.retBest / S.priced) },
     },
+    safer: SF.n ? { target: cfg.safer, slips: SF.n, coverage: r3(SF.n / S.days), hit: r3(SF.won / SF.n), stated: r3(SF.stated / SF.n), avgLegs: r3(SF.legs / SF.n), avgOdds: r3(SF.odds / SF.n), roi: r3(SF.ret / SF.n) } : null,
     allBankers: { n: A.n, hit: r3(A.won / A.n), stated: r3(A.stated / A.n) },
     bigger: Object.fromEntries(Object.entries(BIG).map(([t, g]) => [t, { slips: g.n, coverage: r3(g.n / S.days), hit: r3(g.won / g.n), stated: r3(g.stated / g.n), avgOdds: r3(g.odds / g.n), avgLegs: r3(g.legs / g.n) }])),
   };
@@ -181,7 +194,7 @@ function main() {
   fs.writeFileSync(outFile, JSON.stringify(out, null, 1));
   // RECORD_FILE=lib/banker_record.json writes the numbers the page shows
   if (process.env.RECORD_FILE) {
-    const brief = (e) => ({ window: e.window, legs: { n: e.legs.n, hit: e.legs.hit, stated: e.legs.stated, perDay: e.legs.perDay, roiBest: e.legs.roiBest, nBest: e.legs.nBest, tripleConfirmed: e.legs.tripleConfirmed, byKey: e.legs.byKey }, slip: e.slip, bigger: e.bigger });
+    const brief = (e) => ({ window: e.window, legs: { n: e.legs.n, hit: e.legs.hit, stated: e.legs.stated, perDay: e.legs.perDay, roiBest: e.legs.roiBest, nBest: e.legs.nBest, tripleConfirmed: e.legs.tripleConfirmed, byKey: e.legs.byKey }, slip: e.slip, safer: e.safer, bigger: e.bigger });
     fs.writeFileSync(process.env.RECORD_FILE, JSON.stringify({
       note: 'The production High Banker rule (lib/banker.js) on history: thresholds chosen on the tuning seasons, reported once on the held-out seasons. v6 models trained on 2005-2019 only. Odds: Bet365 where the archive has a price, otherwise estimated from the de-vigged price and the match margin.',
       config: out.config, tuning: brief(out.tuning), heldOut: brief(out.heldOut),

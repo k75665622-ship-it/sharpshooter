@@ -17,6 +17,8 @@ const IN = require('../lib/strongest/inputs');
 const RS = require('../lib/strongest/reasons');
 const REC = require('../lib/strongest/record');
 const C = require('../lib/strongest/config');
+const CAL = require('../lib/strongest/calibrate');
+const PACE = require('../lib/pace');
 const FDS = require('../lib/crawler/sources/footballdata');
 const { History } = require('../lib/factors/history');
 
@@ -33,6 +35,9 @@ function t(name, ok, detail) {
 }
 const near = (a, b, tol = 1e-3) => a != null && b != null && Math.abs(a - b) <= tol;
 const byKey = (sels) => Object.fromEntries(sels.map((s) => [s.key, s]));
+
+// sections 1-5 check the raw maths: no measured models loaded
+CAL._reset({});
 
 // ------------------------------------------------------------------ 1. distributions
 console.log('\n1. Distributions');
@@ -162,9 +167,11 @@ console.log('\n5. ESPN players and line-ups');
 // ------------------------------------------------------------------ 6. pick rules
 console.log('\n6. Pick rules');
 const ctxOk = { hasMarket: true, started: false, avoid: new Set(), ruleTraps: new Set(), shift: {}, news: { home: { highs: 0 }, away: { highs: 0 } }, statsGames: { home: 20, away: 20 } };
+// a measured selection whose measured chance equals its main view (identity calibration)
 const mk = (key, group, views, kind = 'goals', extra = {}) => {
   const vals = Object.values(views);
-  return { key, group, label: key, kind, side: MAR.sideOf(key), prob: views.market != null ? views.market : vals[0], floor: Math.min(...vals), views, nViews: vals.length, ...extra };
+  const main = views.market != null ? views.market : views.model != null ? views.model : vals[0];
+  return { key, group, label: key, kind, side: MAR.sideOf(key), prob: main, raw: main, measured: true, floor: Math.min(...vals), views, nViews: vals.length, ...extra };
 };
 {
   const s = mk('TTA_U1.5', 'Team', { market: 0.86, stats: 0.8, factors: 0.85 });
@@ -176,43 +183,56 @@ const mk = (key, group, views, kind = 'goals', extra = {}) => {
   t('a v6 trap blocks it', PK.blockers(s, { ...ctxOk, avoid: new Set(['TTA_U1.5']) }).some((w) => /trap/.test(w)));
   t('factors rating it below the price blocks it', PK.blockers(s, { ...ctxOk, shift: { 'TTA_U1.5': -0.02 } }).some((w) => /below the price/.test(w)));
   t('kicked off blocks it', PK.blockers(s, { ...ctxOk, started: true }).some((w) => /kicked off/.test(w)));
-  t('serious news on the backed side blocks it', PK.blockers(mk('1', 'Match', { market: 0.8, stats: 0.8 }), { ...ctxOk, news: { home: { highs: 2 }, away: { highs: 0 } } }).some((w) => /team-news/.test(w)));
-  t('serious news on the other side does not', PK.blockers(mk('1', 'Match', { market: 0.8, stats: 0.8 }), { ...ctxOk, news: { home: { highs: 0 }, away: { highs: 2 } } }).length === 0);
-  const c = mk('C_U11.5', 'Corners', { season: 0.78, recent: 0.79 }, 'corners');
-  t('corners need 80% from both views', PK.blockers(c, ctxOk).some((w) => /80%/.test(w)));
-  t('corners qualify at 80%+ with enough games', PK.blockers(mk('C_U11.5', 'Corners', { season: 0.82, recent: 0.81 }, 'corners'), ctxOk).length === 0);
-  t('corners blocked with too few archived games', PK.blockers(mk('C_U11.5', 'Corners', { season: 0.82, recent: 0.81 }, 'corners'), { ...ctxOk, statsGames: { home: 3, away: 20 } }).some((w) => /archived games/.test(w)));
+  t('serious news on the backed side blocks it', PK.blockers(mk('1', 'Match', { market: 0.86, stats: 0.85 }), { ...ctxOk, news: { home: { highs: 2 }, away: { highs: 0 } } }).some((w) => /team-news/.test(w)));
+  t('serious news on the other side does not', PK.blockers(mk('1', 'Match', { market: 0.86, stats: 0.85 }), { ...ctxOk, news: { home: { highs: 0 }, away: { highs: 2 } } }).length === 0);
+  const c = mk('C_U11.5', 'Corners', { model: 0.8, season: 0.84, recent: 0.83 }, 'corners');
+  t(`corners need a measured ${Math.round(C.minChanceStatsOnly * 100)}%`, PK.blockers(c, ctxOk).some((w) => /Measured chance 80%/.test(w)), PK.blockers(c, ctxOk).join(' '));
+  t('corners qualify with the measured bar met and every view agreeing', PK.blockers(mk('C_U11.5', 'Corners', { model: 0.87, season: 0.86, recent: 0.85 }, 'corners'), ctxOk).length === 0, PK.blockers(mk('C_U11.5', 'Corners', { model: 0.87, season: 0.86, recent: 0.85 }, 'corners'), ctxOk).join(' '));
+  t('corners blocked with too few archived games', PK.blockers(mk('C_U11.5', 'Corners', { model: 0.84, season: 0.82, recent: 0.81 }, 'corners'), { ...ctxOk, statsGames: { home: 3, away: 20 } }).some((w) => /archived games/.test(w)));
+  t('corners without the price-aware model are never measured', PK.blockers({ ...mk('C_U11.5', 'Corners', { season: 0.86, recent: 0.85 }, 'corners'), measured: false }, ctxOk).some((w) => /No bookmaker price to read the match/.test(w)));
   t('players never qualify', PK.blockers(mk('PL_H_0', 'Players', { market: 0.8, stats: 0.8 }, 'players'), ctxOk).some((w) => /line-up/.test(w)));
+  t('a market with no measured record never qualifies', PK.blockers({ ...mk('M15_N', 'Minutes', { market: 0.82, stats: 0.81 }), measured: false }, ctxOk).some((w) => /no measured record/.test(w)));
+  t('the measured chance must reach the bar even when every view does', PK.blockers({ ...mk('TTA_U1.5', 'Team', { market: 0.83, stats: 0.8, factors: 0.82 }), prob: 0.78 }, ctxOk).some((w) => /Measured chance 78%/.test(w)));
+  t('the bookmakers\' own probability decides "pays too little" for goal markets', PK.blockers({ ...mk('O1.5', 'Goals', { market: 0.9, stats: 0.86 }), prob: 0.86 }, ctxOk).some((w) => /Pays too little/.test(w)));
+  const keepOff = C.excluded.slice();
+  C.excluded.push('TTA_U1.5');
+  t('an excluded market is kept off the list', PK.blockers(s, ctxOk).some((w) => /kept off the list/.test(w)));
+  C.excluded.length = 0;
+  C.excluded.push(...keepOff);
 }
 {
   // no fixed number of picks
   const fixtures = Array.from({ length: 9 }, (_, i) => ({
     id: String(i), kickoff: `2026-10-24T1${i}:00:00Z`, ctx: ctxOk,
-    sels: [mk('TTA_U1.5', 'Team', { market: 0.8 + i * 0.008, stats: 0.79, factors: 0.81 }), mk('O2.5', 'Goals', { market: 0.6, stats: 0.6 })],
+    sels: [mk('TTA_U1.5', 'Team', { market: C.minChance + 0.005 + i * 0.004, stats: 0.79, factors: 0.81 }), mk('O2.5', 'Goals', { market: 0.6, stats: 0.6 })],
   }));
   const r = PK.select(fixtures);
   t('nine qualifying matches -> nine picks (no cap at five)', r.picks.length === 9, r.picks.length);
   t('one pick per match', new Set(r.picks.map((p) => p.fixture)).size === r.picks.length);
-  t('ordered by the lowest view', r.picks.every((p, i, a) => i === 0 || a[i - 1].sel.floor >= p.sel.floor));
+  t('ordered by the measured chance', r.picks.every((p, i, a) => i === 0 || a[i - 1].sel.prob >= p.sel.prob));
   t('combined chances for 2, 3, 5 and all', r.combined.map((c) => c.size).join(',') === '2,3,5,9', r.combined.map((c) => c.size).join(','));
   t('combined chance is the product', near(r.combined[0].prob, r.picks[0].sel.prob * r.picks[1].sel.prob));
-  const none = PK.select([{ id: 'a', kickoff: 'x', ctx: ctxOk, sels: [mk('1', 'Match', { market: 0.74, stats: 0.71 })] }]);
+  const none = PK.select([{ id: 'a', kickoff: 'x', ctx: ctxOk, sels: [mk('1', 'Match', { market: C.minChance - 0.02, stats: 0.8 })] }]);
   t('nothing qualifies -> no picks, and the near miss is reported', none.picks.length === 0 && none.nearMisses.length === 1);
+  const far = PK.select([{ id: 'a', kickoff: 'x', ctx: ctxOk, sels: [mk('1', 'Match', { market: 0.7, stats: 0.68 })] }]);
+  t('a selection far under the bar is not a near miss', far.picks.length === 0 && far.nearMisses.length === 0);
   t('two qualifying -> two picks', PK.select(fixtures.slice(0, 2)).picks.length === 2);
   const mixed = PK.select([{ id: 'm', kickoff: 'x', ctx: ctxOk, sels: [
-    mk('K_U5.5', 'Bookings', { season: 0.82, recent: 0.81 }, 'cards'),
-    mk('TTA_U1.5', 'Team', { market: 0.82, stats: 0.79, factors: 0.8 }),
+    mk('K_U5.5', 'Bookings', { model: 0.88, season: 0.87, recent: 0.86 }, 'cards'),
+    mk('TTA_U1.5', 'Team', { market: 0.86, stats: 0.84, factors: 0.85 }),
   ] }]);
   t('a bookmaker-backed pick ranks ahead of a slightly stronger cards pick', mixed.picks[0].sel.key === 'TTA_U1.5', mixed.picks[0] && mixed.picks[0].sel.key);
-  const cardsOnly = PK.select([{ id: 'c', kickoff: 'x', ctx: ctxOk, sels: [mk('K_U5.5', 'Bookings', { season: 0.84, recent: 0.83 }, 'cards')] }]);
-  t('a cards pick still qualifies when it is the match\'s only one', cardsOnly.picks.length === 1 && cardsOnly.picks[0].sel.tier === 'Strong');
-  t('tiers by the lowest view', PK.tierOf(0.86) === 'Elite' && PK.tierOf(0.8) === 'Strong' && PK.tierOf(0.76) === 'Solid' && PK.tierOf(0.7) === null);
+  const cardsOnly = PK.select([{ id: 'c', kickoff: 'x', ctx: ctxOk, sels: [mk('K_U5.5', 'Bookings', { model: 0.87, season: 0.86, recent: 0.85 }, 'cards')] }]);
+  t('a cards pick still qualifies when it is the match\'s only one', cardsOnly.picks.length === 1 && cardsOnly.picks[0].sel.tier === PK.tierOf(0.87));
+  const [T1, T2, T3] = C.tiers;
+  t('tiers by the measured chance', PK.tierOf(T1.min + 0.01) === T1.name && PK.tierOf(T2.min + 0.005) === T2.name && PK.tierOf(T3.min + 0.005) === T3.name && PK.tierOf(T3.min - 0.05) === null);
+  t('every pick on the list is at least the lowest list tier', C.tiers.some((t) => t.min <= C.minChance + 1e-9 && PK.tierOf(C.minChance) === t.name));
 }
 {
   const cards = PK.cardPicks(MAR.price({ ...fxBase, goalViews: [{ name: 'market', lamH: 1.83, lamA: 0.63, rho: 0 }, { name: 'stats', lamH: 1.7, lamA: 0.7, rho: 0 }] }));
   t('match card has all nine groups in SportyBet order', cards.map((c) => c.group).join(',') === MAR.GROUPS.join(','));
   t('groups without data say why', cards.find((c) => c.group === 'Corners').none && /statistics/.test(cards.find((c) => c.group === 'Corners').note));
-  t('card picks stay inside the probability band', cards.filter((c) => !c.none).every((c) => c.prob >= C.cardMinProb && c.prob <= C.maxProb));
+  t('card picks stay inside the probability band', cards.filter((c) => !c.none).every((c) => c.prob >= C.cardMinProb && PK.payProb(c) <= C.maxProb));
 }
 
 // ------------------------------------------------------------------ 7. reasons
@@ -239,7 +259,7 @@ console.log('\n7. Reasons');
   t('checks line lists every view', /Market/.test(e.checks) && /Stats model/.test(e.checks));
   const ec = RS.explain(byKey(sels)['C_U11.5'], fx, report);
   t('corner reasons quote corners per game and the expectation', ec.reasons.some((r) => /Corners per game/.test(r)) && ec.reasons.some((r) => /Expected corners/.test(r)), ec.reasons.join(' | '));
-  t('statistics-only caveat on corners', ec.caveats.some((c) => /Statistics-only/.test(c)));
+  t('no-bookmaker-price caveat on corners', ec.caveats.some((c) => /No bookmaker price for this market/.test(c)));
   const sparse = RS.explain(byKey(sels)['1'], { ...fx, facts: {} }, {});
   t('missing data leaves sentences out instead of failing', Array.isArray(sparse.reasons));
 }
@@ -273,6 +293,86 @@ console.log('\n8. Settlement');
   const ev = REC.espnEvents(comp);
   t('ESPN details -> goals with minutes, own goals without a scorer, cards per side', ev.goals.length === 2 && ev.goals[0].minute === 12 && ev.goals[1].ownGoal && ev.goals[1].scorer === null && ev.cards.away === 1);
   t('no details -> null (settled later from the archive)', REC.espnEvents({ competitors: [], details: [] }) === null);
+}
+
+// ------------------------------------------------------------------ 9. the possession model (lib/pace.js)
+console.log('\n9. Possession model: shots a game x goals per shot');
+{
+  // a league where home sides take 13 shots and score 1.5, away sides 11 and 1.2
+  const lg = [];
+  for (let i = 0; i < 200; i++) lg.push({ date: '2026-01-01', hs: 13, as: 11, hst: 5, ast: 4, hg: 1.5, ag: 1.2 });
+  const base = PACE.leagueBase(lg);
+  t('league base: shots and goals per match by venue', near(base.home.shots, 13) && near(base.away.shots, 11) && near(base.home.goals, 1.5) && near(base.away.goals, 1.2));
+  t('league base: goals per shot', near(base.goalsPerShot, 2.7 / 24));
+  t('league base needs 50 matches with shots', PACE.leagueBase(lg.slice(0, 20)) === null);
+  // an exactly average side: home games 13 for / 11 against, away games 11 for / 13 against
+  const avgLog = (n) => Array.from({ length: n }, (_, i) => (i % 2
+    ? { venue: 'A', sf: 11, sa: 13, gf: 1.2, ga: 1.5 }
+    : { venue: 'H', sf: 13, sa: 11, gf: 1.5, ga: 1.2 }));
+  const r = PACE.teamRates(avgLog(20), 'H', base);
+  t('an average side rates 1 on volume and efficiency', near(r.attack, 1, 1e-6) && near(r.defence, 1, 1e-6) && near(r.finishing, 1, 0.02) && near(r.keeping, 1, 0.02), JSON.stringify(r));
+  const p = PACE.lambdas({ homeLog: avgLog(20), awayLog: avgLog(20), base });
+  t('two average sides -> the league\'s home and away goals', near(p.lamH, 1.5, 0.03) && near(p.lamA, 1.2, 0.03), `${p.lamH} ${p.lamA}`);
+  // a side that takes 30% more shots at the same finishing
+  const busy = avgLog(20).map((g) => ({ ...g, sf: g.sf * 1.3, gf: g.gf * 1.3 }));
+  const q = PACE.lambdas({ homeLog: busy, awayLog: avgLog(20), base });
+  t('more shots, same finishing -> more expected goals (averaged with the opponent\'s defence)', q.lamH > p.lamH * 1.1 && q.lamH < p.lamH * 1.3, q.lamH);
+  t('expected goals = average volume x average efficiency (the video\'s formula)', near(q.lamH, base.home.shots * (q.home.attack + q.away.defence) / 2 * (base.home.goals / base.home.shots) * (q.home.finishing + q.away.keeping) / 2, 1e-9));
+  t('too few games with shots -> no possession view', PACE.lambdas({ homeLog: avgLog(3), awayLog: avgLog(20), base }) === null);
+  const env = { shots: base };
+  const pv = IN.paceView(env, avgLog(20), avgLog(20));
+  t('the possession view joins the goal views by name', pv && pv.name === 'pace' && pv.lamH > 0 && pv.detail && pv.detail.home.perGame.shotsFor === 12);
+  const fx = { ...fxBase, goalViews: [{ name: 'market', lamH: 1.5, lamA: 1.2, rho: 0 }, pv] };
+  const S = byKey(MAR.price(fx));
+  t('every goal selection gets a possession view', S['O2.5'].views.pace != null && S['TTH_O0.5'].views.pace != null && S['1X'].views.pace != null);
+  const e = RS.explain(S['TTH_O0.5'], { ...fx, ctx: ctxOk, facts: {} }, {});
+  t('reasons describe the possession model', e.reasons.some((x) => /Possession model: .* shots a game/.test(x)), e.reasons.join(' | '));
+  t('a real Premier League side gets possession rates from the archive', (() => {
+    const pr = PACE.lambdas({ homeLog: arsenal, awayLog: hist.teamLog('E0', 'Burnley', day, 40), base: env4().shots });
+    return pr && pr.lamH > 0.5 && pr.lamH < 4 && pr.home.attack > 1;
+  })());
+}
+function env4() {
+  return IN.leagueEnv(hist, 'E0', day);
+}
+
+// ------------------------------------------------------------------ 10. measured chances (lib/strongest/calibrate.js)
+console.log('\n10. Measured chances');
+{
+  CAL._reset({
+    goals: { 'TTA_U1.5': { a: 0, b: 1, c: 0.4, d: -0.2, e: 0.1 }, 'O2.5': { a: 0, b: 1, c: 0, d: 0, e: 0 } },
+    corners: { coef: { home: 0, away: 0, seasonAtt: 0, oppSeasonDef: 0, recentAtt: 0, oppRecentDef: 0, priceStrengthGap: 0.25, priceTotal: 0, shotVolume: 0, oppShotsConceded: 0 }, dispersion: 12 },
+    cards: { coef: { intercept: 0, seasonForm: 0, recentForm: 0, h2h: 0, priceMismatch: -0.12, priceTotal: 0, expectedShots: 0 }, dispersion: 40 },
+    stats: { C_U: { a: 0, b: 1 }, K_O: { a: -0.2, b: 1 } },
+    measured: { window: 'test', all: { n: 1, hit: 0.84, stated: 0.84 }, families: { 'TT_U1.5': { n: 500, hit: 0.85, stated: 0.84, label: 'Team under 1.5 goals' } } },
+  });
+  t('identity calibration returns the market view', near(CAL.goalChance('O2.5', { market: 0.61, stats: 0.7 }), 0.61, 1e-9));
+  const up = CAL.goalChance('TTA_U1.5', { market: 0.8, factors: 0.85 });
+  const down = CAL.goalChance('TTA_U1.5', { market: 0.8, stats: 0.85 });
+  t('factors above the price raise the measured chance, part of the way', up > 0.8 && up < 0.85, up);
+  t('a form-only stats view above the price LOWERS it (it was on the wrong side)', down < 0.8, down);
+  t('no calibration for the market -> null (not measured)', CAL.goalChance('HSH_2', { market: 0.6 }) === null);
+  const cm = CAL.cornerMeans({ base: { home: 5.5, away: 4.5 }, seasonH: { att: 1, def: 1 }, seasonA: { att: 1, def: 1 }, recentH: { att: 1, def: 1 }, recentA: { att: 1, def: 1 }, lam: { home: 2.2, away: 0.8 } });
+  t('a strong home favourite wins more corners than its form alone says', cm.home > 5.5 && cm.away < 4.5, JSON.stringify(cm));
+  t('no price -> no form + price corner model', CAL.cornerMeans({ base: { home: 5.5, away: 4.5 }, seasonH: { att: 1, def: 1 }, seasonA: { att: 1, def: 1 }, recentH: { att: 1, def: 1 }, recentA: { att: 1, def: 1 }, lam: null }) === null);
+  const k1 = CAL.cardMean({ base: { home: 2, away: 2.2 }, season: { home: 1, away: 1 }, recent: { home: 1, away: 1 }, h2h: 1, lam: { home: 1.3, away: 1.3 } });
+  const k2 = CAL.cardMean({ base: { home: 2, away: 2.2 }, season: { home: 1, away: 1 }, recent: { home: 1, away: 1 }, h2h: 1, lam: { home: 2.6, away: 0.6 } });
+  t('a lopsided game is booked less than an even one', k2.mu < k1.mu, `${k1.mu} ${k2.mu}`);
+  t('referee factor applies on top', near(CAL.cardMean({ base: { home: 2, away: 2.2 }, season: { home: 1, away: 1 }, recent: { home: 1, away: 1 }, h2h: 1, referee: 1.2, lam: { home: 1.3, away: 1.3 } }).mu, k1.mu * 1.2, 1e-9));
+  t('corner / card line calibration by family', near(CAL.statsChance('C_U9.5', 0.8), 0.8, 1e-9) && CAL.statsChance('K_O3.5', 0.8) < 0.8 && CAL.statsChance('C_MOST_H', 0.8) === null);
+  t('families group lines and sides', CAL.family('TTH_U2.5') === 'TT_U2.5' && CAL.family('CA_O3.5') === 'C_TEAM_O' && CAL.family('X2') === 'DC' && CAL.family('K_U4.5') === 'K_U');
+  // pricing with measured models: prob is the measured chance, raw keeps the market view
+  const fx = { ...fxBase, goalViews: [{ name: 'market', lamH: 1.83, lamA: 0.63, rho: 0 }, { name: 'factors', lamH: 1.9, lamA: 0.55, rho: 0 }], cornerViews: [] };
+  const S = byKey(MAR.price(fx));
+  t('a measured market: prob is the measured chance, raw the market view', S['TTA_U1.5'].measured && near(S['TTA_U1.5'].raw, S['TTA_U1.5'].views.market) && S['TTA_U1.5'].prob > S['TTA_U1.5'].raw);
+  t('an unmeasured market keeps its raw figure and says so', !S.HSH_2.measured && near(S.HSH_2.prob, S.HSH_2.raw));
+  const sv = IN.statsViews({ env: env4(), homeLog: arsenal, awayLog: hist.teamLog('E0', 'Burnley', day, 40), h2h: null, referee: null, lamMarket: { home: 2.1, away: 0.8 }, pace: null });
+  t('statsViews: the form + price model leads the corner and card views', sv.corners[0].name === 'model' && sv.cards[0].name === 'model' && sv.corners.length === 3);
+  const sv0 = IN.statsViews({ env: env4(), homeLog: arsenal, awayLog: hist.teamLog('E0', 'Burnley', day, 40), h2h: null, referee: null, lamMarket: null, pace: null });
+  t('statsViews: no price -> form-only views (never measured, never picked)', sv0.corners.length === 2 && sv0.corners.every((v) => v.name !== 'model'));
+  const ml = RS.measuredLine({ key: 'TTA_U1.5', prob: 0.86, raw: 0.84, measured: true, main: 'market' });
+  t('reasons quote the measured record of the market', /Measured chance 86%/.test(ml) && /500 past Strongest Picks/.test(ml) && /85\.0% won/.test(ml), ml);
+  CAL._reset();
 }
 
 console.log('\n=========================================================');
