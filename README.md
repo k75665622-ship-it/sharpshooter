@@ -102,19 +102,21 @@ view that disagrees with the bookmakers is on the **wrong** side of them in ever
 bookmaker price of their own and are only priced when the bookmakers' read of the match exists); every view rates it at
 least **75%**; the bookmakers' own probability is at most **88%** (it still pays 1.14+); the v6 layer does not flag it
 as a trap or overrated by the price; no serious team news hits the side it backs; and the market has a measured record
-(minute markets and scorers do not, so they stay on the match cards only). Strength is the measured chance: **Elite**
-87%+, **Strong** 84%+. Every number lives in [`lib/strongest/config.js`](lib/strongest/config.js).
+(minute markets and scorers do not, so they stay on the match cards only). **Team under 1.5 goals** is kept off the
+list too: at this level it won 1-3 points less than stated in both research periods, worst against a heavy favourite
+(it stays on the match cards). Strength is the measured chance: **Elite** 87%+, **Strong** 84%+. Every number lives in
+[`lib/strongest/config.js`](lib/strongest/config.js).
 
 **Measured, not promised.** The rule was replayed with the production code on all 76,528 priced matches from July
 2019 (`research/v6/strongest_study.js`), models and bars chosen on 2019-23 and the 2023-26 seasons measured once:
 
 | Held-out 2023-26 (29,191 matches) | Old rule (v1) | **New rule (v2)** |
 |---|---|---|
-| Strongest Picks | 28,361 — 97% of matches, ~31 a match day | **18,470 — 63% of matches, ~20 a match day** |
+| Strongest Picks | 28,361 — 97% of matches, ~31 a match day | **18,309 — 63% of matches, ~19 a match day** |
 | Won (stated) | 84.1% (84.5%) | **86.4% (86.7%)** |
-| Corners | 79.3% (85.5%) — form alone overrated them | **87.0% (87.0%)** |
-| Bookings | 82.4% (85.6%) | **86.5% (87.0%)** |
-| Elite / Strong | — | 87.5% (88.0%) / 85.4% (85.6%) |
+| Corners | 79.3% (85.5%) — form alone overrated them | **86.9% (87.0%)** |
+| Bookings | 82.4% (85.6%) | **86.7% (87.0%)** |
+| Elite / Strong | — | 87.6% (88.0%) / 85.5% (85.6%) |
 
 Even at 86%, about one pick in seven loses: a strong pick is not a certain one, and the page says so.
 

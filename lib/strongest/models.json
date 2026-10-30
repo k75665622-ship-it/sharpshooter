@@ -288,30 +288,30 @@
  "measured": {
   "window": "Jul 2023 – Sept 2026",
   "matches": 29191,
-  "perMatchDay": 19.6,
-  "pickShare": 0.633,
+  "perMatchDay": 19.4,
+  "pickShare": 0.627,
   "all": {
-   "n": 18470,
+   "n": 18309,
    "hit": 0.864,
    "stated": 0.867
   },
   "tiers": {
    "Strong": {
-    "n": 10273,
-    "hit": 0.854,
+    "n": 10188,
+    "hit": 0.855,
     "stated": 0.856
    },
    "Elite": {
-    "n": 8197,
-    "hit": 0.875,
+    "n": 8121,
+    "hit": 0.876,
     "stated": 0.88
    }
   },
   "families": {
    "12": {
-    "n": 368,
-    "hit": 0.837,
-    "stated": 0.863,
+    "n": 396,
+    "hit": 0.833,
+    "stated": 0.862,
     "label": "Either team to win"
    },
    "TT_U2.5": {
@@ -321,62 +321,56 @@
     "label": "Team under 2.5 goals"
    },
    "TT_O0.5": {
-    "n": 3326,
+    "n": 3354,
     "hit": 0.869,
     "stated": 0.862,
     "label": "Team to score"
    },
    "H2_O0.5": {
-    "n": 1079,
+    "n": 1095,
     "hit": 0.861,
     "stated": 0.865,
     "label": "Goal in the 2nd half"
    },
    "DC": {
-    "n": 934,
-    "hit": 0.859,
+    "n": 948,
+    "hit": 0.86,
     "stated": 0.865,
     "label": "Double chance"
    },
    "O1.5": {
-    "n": 650,
-    "hit": 0.869,
+    "n": 656,
+    "hit": 0.87,
     "stated": 0.863,
     "label": "Over 1.5 goals"
    },
-   "K_O": {
-    "n": 641,
-    "hit": 0.861,
-    "stated": 0.87,
-    "label": "Cards over"
-   },
    "C_TEAM_O": {
-    "n": 639,
-    "hit": 0.869,
+    "n": 651,
+    "hit": 0.866,
     "stated": 0.87,
     "label": "Team corners over"
    },
+   "K_O": {
+    "n": 647,
+    "hit": 0.862,
+    "stated": 0.87,
+    "label": "Cards over"
+   },
    "U3.5": {
-    "n": 563,
-    "hit": 0.87,
+    "n": 568,
+    "hit": 0.871,
     "stated": 0.858,
     "label": "Under 3.5 goals"
    },
-   "TT_U1.5": {
-    "n": 291,
-    "hit": 0.835,
-    "stated": 0.864,
-    "label": "Team under 1.5 goals"
-   },
    "K_U": {
-    "n": 197,
-    "hit": 0.878,
+    "n": 202,
+    "hit": 0.881,
     "stated": 0.87,
     "label": "Cards under"
    },
    "H1_O0.5": {
-    "n": 85,
-    "hit": 0.918,
+    "n": 89,
+    "hit": 0.921,
     "stated": 0.864,
     "label": "Goal in the 1st half"
    },
@@ -387,15 +381,15 @@
     "label": "Home to win either half"
    },
    "C_O": {
-    "n": 15,
-    "hit": 0.867,
+    "n": 16,
+    "hit": 0.875,
     "stated": 0.871,
     "label": "Total corners over"
    },
    "C_MOST": {
-    "n": 11,
+    "n": 14,
     "hit": 1,
-    "stated": 0.873,
+    "stated": 0.874,
     "label": "Most corners"
    },
    "C_U": {
@@ -417,15 +411,15 @@
     "label": "Away to win either half"
    },
    "DC1X_O1.5": {
-    "n": 2,
+    "n": 3,
     "hit": 1,
-    "stated": 0.865,
+    "stated": 0.864,
     "label": "Home or draw & over 1.5"
    },
    "TT_O1.5": {
-    "n": 1,
+    "n": 2,
     "hit": 1,
-    "stated": 0.852,
+    "stated": 0.862,
     "label": "Team over 1.5 goals"
    }
   }

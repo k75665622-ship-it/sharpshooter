@@ -174,14 +174,14 @@ const mk = (key, group, views, kind = 'goals', extra = {}) => {
   return { key, group, label: key, kind, side: MAR.sideOf(key), prob: main, raw: main, measured: true, floor: Math.min(...vals), views, nViews: vals.length, ...extra };
 };
 {
-  const s = mk('TTA_U1.5', 'Team', { market: 0.86, stats: 0.8, factors: 0.85 });
+  const s = mk('TTA_U2.5', 'Team', { market: 0.86, stats: 0.8, factors: 0.85 });
   t('a selection every view rates 80%+ qualifies', PK.blockers(s, ctxOk).length === 0, PK.blockers(s, ctxOk).join(' '));
   t('one weak view blocks it', PK.blockers(mk('1', 'Match', { market: 0.86, stats: 0.7, factors: 0.85 }), ctxOk).some((w) => /lowest view/.test(w)));
   t('too short a price blocks it', PK.blockers(mk('O1.5', 'Goals', { market: 0.92, stats: 0.9 }), ctxOk).some((w) => /Pays too little/.test(w)));
   t('a single view is not enough', PK.blockers(mk('1', 'Match', { market: 0.8 }), ctxOk).some((w) => /Only one view/.test(w)));
   t('no bookmaker price -> goal picks blocked', PK.blockers(s, { ...ctxOk, hasMarket: false }).some((w) => /No bookmaker/.test(w)));
-  t('a v6 trap blocks it', PK.blockers(s, { ...ctxOk, avoid: new Set(['TTA_U1.5']) }).some((w) => /trap/.test(w)));
-  t('factors rating it below the price blocks it', PK.blockers(s, { ...ctxOk, shift: { 'TTA_U1.5': -0.02 } }).some((w) => /below the price/.test(w)));
+  t('a v6 trap blocks it', PK.blockers(s, { ...ctxOk, avoid: new Set(['TTA_U2.5']) }).some((w) => /trap/.test(w)));
+  t('factors rating it below the price blocks it', PK.blockers(s, { ...ctxOk, shift: { 'TTA_U2.5': -0.02 } }).some((w) => /below the price/.test(w)));
   t('kicked off blocks it', PK.blockers(s, { ...ctxOk, started: true }).some((w) => /kicked off/.test(w)));
   t('serious news on the backed side blocks it', PK.blockers(mk('1', 'Match', { market: 0.86, stats: 0.85 }), { ...ctxOk, news: { home: { highs: 2 }, away: { highs: 0 } } }).some((w) => /team-news/.test(w)));
   t('serious news on the other side does not', PK.blockers(mk('1', 'Match', { market: 0.86, stats: 0.85 }), { ...ctxOk, news: { home: { highs: 0 }, away: { highs: 2 } } }).length === 0);
@@ -192,19 +192,22 @@ const mk = (key, group, views, kind = 'goals', extra = {}) => {
   t('corners without the price-aware model are never measured', PK.blockers({ ...mk('C_U11.5', 'Corners', { season: 0.86, recent: 0.85 }, 'corners'), measured: false }, ctxOk).some((w) => /No bookmaker price to read the match/.test(w)));
   t('players never qualify', PK.blockers(mk('PL_H_0', 'Players', { market: 0.8, stats: 0.8 }, 'players'), ctxOk).some((w) => /line-up/.test(w)));
   t('a market with no measured record never qualifies', PK.blockers({ ...mk('M15_N', 'Minutes', { market: 0.82, stats: 0.81 }), measured: false }, ctxOk).some((w) => /no measured record/.test(w)));
-  t('the measured chance must reach the bar even when every view does', PK.blockers({ ...mk('TTA_U1.5', 'Team', { market: 0.83, stats: 0.8, factors: 0.82 }), prob: 0.78 }, ctxOk).some((w) => /Measured chance 78%/.test(w)));
+  t('the measured chance must reach the bar even when every view does', PK.blockers({ ...mk('TTA_U2.5', 'Team', { market: 0.83, stats: 0.8, factors: 0.82 }), prob: 0.78 }, ctxOk).some((w) => /Measured chance 78%/.test(w)));
   t('the bookmakers\' own probability decides "pays too little" for goal markets', PK.blockers({ ...mk('O1.5', 'Goals', { market: 0.9, stats: 0.86 }), prob: 0.86 }, ctxOk).some((w) => /Pays too little/.test(w)));
   const keepOff = C.excluded.slice();
-  C.excluded.push('TTA_U1.5');
+  C.excluded.push('TTA_U2.5');
   t('an excluded market is kept off the list', PK.blockers(s, ctxOk).some((w) => /kept off the list/.test(w)));
   C.excluded.length = 0;
   C.excluded.push(...keepOff);
+  t('production: team under 1.5 goals is kept off the list (it ran 1-3 points under its stated chance in both periods)',
+    ['TTH_U1.5', 'TTA_U1.5'].every((k) => PK.blockers(mk(k, 'Team', { market: 0.87, stats: 0.86, factors: 0.88 }), ctxOk).some((w) => /kept off the list/.test(w))));
+  t('production: the exclusion keeps team under 2.5 goals', PK.blockers(mk('TTH_U2.5', 'Team', { market: 0.87, stats: 0.86, factors: 0.88 }), ctxOk).length === 0);
 }
 {
   // no fixed number of picks
   const fixtures = Array.from({ length: 9 }, (_, i) => ({
     id: String(i), kickoff: `2026-10-24T1${i}:00:00Z`, ctx: ctxOk,
-    sels: [mk('TTA_U1.5', 'Team', { market: C.minChance + 0.005 + i * 0.004, stats: 0.79, factors: 0.81 }), mk('O2.5', 'Goals', { market: 0.6, stats: 0.6 })],
+    sels: [mk('TTA_U2.5', 'Team', { market: C.minChance + 0.005 + i * 0.004, stats: 0.79, factors: 0.81 }), mk('O2.5', 'Goals', { market: 0.6, stats: 0.6 })],
   }));
   const r = PK.select(fixtures);
   t('nine qualifying matches -> nine picks (no cap at five)', r.picks.length === 9, r.picks.length);
@@ -219,9 +222,14 @@ const mk = (key, group, views, kind = 'goals', extra = {}) => {
   t('two qualifying -> two picks', PK.select(fixtures.slice(0, 2)).picks.length === 2);
   const mixed = PK.select([{ id: 'm', kickoff: 'x', ctx: ctxOk, sels: [
     mk('K_U5.5', 'Bookings', { model: 0.88, season: 0.87, recent: 0.86 }, 'cards'),
-    mk('TTA_U1.5', 'Team', { market: 0.86, stats: 0.84, factors: 0.85 }),
+    mk('TTA_U2.5', 'Team', { market: 0.86, stats: 0.84, factors: 0.85 }),
   ] }]);
-  t('a bookmaker-backed pick ranks ahead of a slightly stronger cards pick', mixed.picks[0].sel.key === 'TTA_U1.5', mixed.picks[0] && mixed.picks[0].sel.key);
+  t('a bookmaker-backed pick ranks ahead of a slightly stronger cards pick', mixed.picks[0].sel.key === 'TTA_U2.5', mixed.picks[0] && mixed.picks[0].sel.key);
+  const swap = PK.select([{ id: 'u', kickoff: 'x', ctx: ctxOk, sels: [
+    mk('TTA_U1.5', 'Team', { market: 0.88, stats: 0.87, factors: 0.88 }),
+    mk('TTA_U2.5', 'Team', { market: 0.86, stats: 0.85, factors: 0.86 }),
+  ] }]);
+  t('an excluded market gives way to the match\'s next qualifying selection', swap.picks.length === 1 && swap.picks[0].sel.key === 'TTA_U2.5', swap.picks[0] && swap.picks[0].sel.key);
   const cardsOnly = PK.select([{ id: 'c', kickoff: 'x', ctx: ctxOk, sels: [mk('K_U5.5', 'Bookings', { model: 0.87, season: 0.86, recent: 0.85 }, 'cards')] }]);
   t('a cards pick still qualifies when it is the match\'s only one', cardsOnly.picks.length === 1 && cardsOnly.picks[0].sel.tier === PK.tierOf(0.87));
   const [T1, T2, T3] = C.tiers;
