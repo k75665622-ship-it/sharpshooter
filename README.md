@@ -205,6 +205,45 @@ marked unmeasured. Every builder is written down before kick-off and settled leg
 `npm run test:betbuilder` runs its offline tests (the joint model against the score model and the Strongest pricer,
 correlated and contradictory legs, scorers, the search against brute force, the rules).
 
+## Tiers — every methodology pick, by its chance of winning
+
+The **Tiers** tab lists the day's methodology picks (Over / Under 2.5, both teams to score, team goals, home / draw /
+away, double chance, handicaps, final score) in five drop-downs by their chance of winning; each opens to the
+methodologies and matches under it, with a filter by market:
+
+| Tier | Chance | Held-out 2023-26: won (stated) | Picks a match day (18 leagues) |
+|---|---|---|---|
+| **Diamond** | 80%+ | **85.6%** (84.3%) · 1,143 picks | 1.4 |
+| **Gold** | 70-80% | **76.3%** (75.3%) · 10,569 | 14.6 |
+| **Silver** | 60-70% | **65.1%** (64.6%) · 7,543 | 9.8 |
+| **Bronze** | 50-60% | **56.6%** (57.8%) · 1,860 | 2.4 |
+| Long shot | under 50% (draws, final scores, a team failing to score) | 30.3% (31.0%) · 1,135 | 1.4 |
+
+2019-23 the same: 84.0%, 75.1%, 65.4%, 57.7%, 30.1%. A tier is the chance a pick wins, not a promise — even a
+Diamond pick loses about one time in seven. (Until v5.1 the tier came from the 0-100 methodology score: its top tier,
+"Platinum", reached about one pick a month, and a Gold final score shared a tier with a Gold double chance.)
+
+**The methodology audit behind it (v5.1, `research/methods_audit.js`).** All thirteen methodologies were replayed on
+46,075 matches with every gate and checklist item recorded. What it found:
+
+- **Nothing loses more than it says.** Every methodology's picks won within about two points of their stated chance
+  in both periods. The losses are the chance itself: an Over 2.5 pick at 65% loses one time in three.
+- **The checklist did not decide how often a pick won.** Among picks that pass every hard gate, those with 70-85% of
+  their checklist won as often as stated (2019-22 +0.6 points, 2023-26 +0.4), exactly like the 85%+ ones (+0.0,
+  +0.7). The 85% bar was hiding about a third of the matches that fit a methodology, so **70% now qualifies** (the
+  draw keeps 85%: for draws the checklist does help). Held-out, that is 12,538 fixtures with a methodology pick
+  instead of 9,114, still winning 72.1% against 71.5% stated. The double-confirmed accumulator keeps the 85% bar its
+  record was measured with.
+- **The hard gates are mostly neutral**; a few help a little (Over 2.5's low-block gate, Home Win's lead over the
+  draw, the Draw's table gap) and none select worse picks.
+- **Not every match was analysed.** Only the first 60 matches still to play (those with a bookmaker price first) ever
+  reached the methodologies — on a Saturday about half the board. Now the first 60 answer at once and **every other
+  match still to play is analysed in the background** (the page says so and updates), then the predictions, Strongest
+  Picks and bet builders are rebuilt with them.
+
+`/api/predictions` carries `tiers` (with the measured record) and `dayCoverage` (matches still to play, analysed,
+still waiting).
+
 ---
 
 ## What's new in v6

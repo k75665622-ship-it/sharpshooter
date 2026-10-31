@@ -47,7 +47,7 @@ including 2023-26. **Under 2.5 is still the weakest goals market. Treat it with 
 | **STREAK** | Mistake 11 | No side scoring in 6+ straight games that the model also backs |
 | **RECENCY** ⭐ | **Rule 38** | The price is NOT built on an extreme streak: not (≥ 70% Unders **and** ≥ 45% clean sheets across both sides) |
 
-## ✅ CHECKLIST (≥ 85% of known items)
+## ✅ CHECKLIST (≥ 70% of known items — v5.1; it was 85%)
 
 | Item | Pass at |
 |---|---|

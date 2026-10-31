@@ -44,6 +44,10 @@ const IS = require('./lib/infersports');
 const MI = require('./lib/methodology');
 const LEDGER = require('./lib/ledger');
 const BACKTEST = require('./lib/backtest.json');
+const TIER_INFO = (BACKTEST.tiers || []).map((t) => ({
+  name: t.name, min: t.min, label: t.label,
+  heldOut: t.heldOut ? { n: t.heldOut.n, hitRate: t.heldOut.hitRate, statedProb: t.heldOut.statedProb, perMatchDay: t.heldOut.perMatchDay } : null,
+}));
 const ACC = require('./lib/intel/accumulator');
 const HTTPC = require('./lib/crawler/http');
 const WH = require('./lib/crawler/warehouse');
@@ -235,6 +239,20 @@ async function getAnalysis(league, eventId, year, matchHint, dateYmd) {
   return report;
 }
 
+/*
+ * A busy day has well over a hundred fixtures. The first `limit` still to play (those with a
+ * bookmaker price first, then by league tier) are analysed before the day's first answer; EVERY
+ * other match still to play (up to DAY_MAX) is analysed in the background, after which the day's
+ * predictions, Strongest Picks and bet builders are rebuilt with it. Until then, those matches
+ * join with their latest analysis from the day book when they have one. (Before, only the first
+ * 60 were ever analysed: on a Saturday about half the matches never reached a methodology.)
+ */
+const DAY_FIRST = 60;
+const DAY_MAX = Number(process.env.SHARPSHOOTER_DAY_MAX) || 250;
+const REST_REFRESH_MS = 20 * 60 * 1000; // a match analysed in the background is refreshed at most this often
+const restRuns = new Map(); // dateYmd -> the running background pass
+const restTried = new Map(); // "league:id" -> last attempt, so a fixture that fails is not retried in a loop
+
 /** Analyse every match on a date, with a concurrency cap. */
 async function analyseDay(dateYmd, limit) {
   const board = await buildBoard(dateYmd);
@@ -242,7 +260,7 @@ async function analyseDay(dateYmd, limit) {
 
   // Analyse the matches still to play, those with bookmaker odds first. A match that has kicked
   // off is never re-predicted: it keeps its pre-match prediction from the day book (below).
-  const candidates = all
+  const toPlay = all
     .filter((m) => m.state === 'pre')
     .sort((a, b) => {
       const ao = a.odds ? 0 : 1;
@@ -250,7 +268,8 @@ async function analyseDay(dateYmd, limit) {
       if (ao !== bo) return ao - bo;
       return a.leagueTier - b.leagueTier;
     })
-    .slice(0, limit || 60);
+    .slice(0, DAY_MAX);
+  const candidates = toPlay.slice(0, limit || DAY_FIRST);
 
   const reports = [];
   const queue = [...candidates];
@@ -268,12 +287,51 @@ async function analyseDay(dateYmd, limit) {
     }
   }
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length || 1) }, worker));
+
+  // every other match still to play: its latest analysis now, a fresh one in the background
+  const now = Date.now();
+  const due = [];
+  let pending = 0;
+  for (const m of toPlay.slice(candidates.length)) {
+    const saved = DAYBOOK.getReport(m.league, m.id);
+    if (saved) reports.push(saved.report);
+    else pending++;
+    const tried = restTried.get(`${m.league}:${m.id}`) || 0;
+    if ((!saved || now - saved.savedAt >= REST_REFRESH_MS) && now - tried >= REST_REFRESH_MS) due.push(m);
+  }
+  if (due.length) analyseRest(dateYmd, limit, due);
+
   for (const m of all) {
     if (m.state === 'pre') continue;
     const saved = DAYBOOK.getReport(m.league, m.id);
     if (saved) reports.push(DAYBOOK.withLive(saved.report, m));
   }
-  return { board, reports };
+  const coverage = { fixtures: all.length, toPlay: toPlay.length, analysed: toPlay.length - pending, pending };
+  return { board, reports, coverage };
+}
+
+/** The background pass over the rest of the day, then the day's payloads rebuilt with it. */
+function analyseRest(dateYmd, limit, matches) {
+  if (restRuns.has(dateYmd)) return;
+  if (restTried.size > 5000) restTried.clear();
+  const run = (async () => {
+    const queue = [...matches];
+    const worker = async () => {
+      while (queue.length) {
+        const m = queue.shift();
+        restTried.set(`${m.league}:${m.id}`, Date.now());
+        try {
+          await getAnalysis(m.league, m.id, m.seasonYear, m);
+        } catch {
+          /* left out until it is tried again (REST_REFRESH_MS) */
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(4, queue.length) }, worker));
+    await freshPredictions(dateYmd, limit).catch(() => null);
+    await freshStrongest(dateYmd, limit).catch(() => null);
+  })().finally(() => restRuns.delete(dateYmd));
+  restRuns.set(dateYmd, run);
 }
 
 /** Legacy banker view: kept so existing API consumers do not break. */
@@ -345,7 +403,7 @@ async function buildBankers(dateYmd, limit) {
  * the strongest single prediction per fixture, ranked LOCK > PREDICT > PAPER.
  * `fixtures` carries every match's state and score so results can be shown.
  */
-function assemblePredictions(dateYmd, board, reports) {
+function assemblePredictions(dateYmd, board, reports, dayCoverage) {
   // Write every pre-match prediction to the track record before anyone sees a result.
   try {
     LEDGER.record(reports);
@@ -387,10 +445,14 @@ function assemblePredictions(dateYmd, board, reports) {
     fixtures: SS.fixturesFrom(board.leagues.flatMap((lg) => lg.matches)),
     analysed: reports.length,
     analysable: analysable.length,
+    // the matches still to play on the board, how many have been analysed, how many are waiting
+    dayCoverage: dayCoverage || null,
     predicted: agg.headline.length,
     statusCounts,
     coverage: { withHistory, withElo },
     methods: MI.SPECS.map((s) => ({ id: s.id, name: s.name, family: s.family, count: agg.counts[s.id] || 0 })),
+    // the tiers (a pick's chance) and how each did on held-out seasons (lib/backtest.json)
+    tiers: TIER_INFO,
     headline: agg.headline,
     byMethod: agg.byMethod,
     // v5: the general prediction for EVERY analysable fixture, so a match that falls under
@@ -415,8 +477,8 @@ function freshPredictions(dateYmd, limit) {
   const key = `${dateYmd}|${limit}`;
   if (predInflight.has(key)) return predInflight.get(key);
   const p = (async () => {
-    const { board, reports } = await analyseDay(dateYmd, limit);
-    const out = assemblePredictions(dateYmd, board, reports);
+    const { board, reports, coverage } = await analyseDay(dateYmd, limit);
+    const out = assemblePredictions(dateYmd, board, reports, coverage);
     const iso = isoFromYmd(dateYmd);
     const prev = DAYBOOK.getPayload('predictions', iso);
     const merged = SS.mergePredictions(prev ? prev.payload : null, out);
@@ -437,8 +499,10 @@ async function predictionsFor(dateYmd, limit, opts = {}) {
   const saved = opts.refresh ? null : DAYBOOK.getPayload('predictions', iso);
   if (saved) {
     const age = Date.now() - saved.savedAt;
-    const refreshing = age >= PRED_FRESH_MS;
-    if (refreshing) freshPredictions(dateYmd, limit).catch(() => null);
+    const stale = age >= PRED_FRESH_MS;
+    if (stale) freshPredictions(dateYmd, limit).catch(() => null);
+    // still updating while the rest of the day is being analysed in the background
+    const refreshing = stale || restRuns.has(dateYmd);
     let payload = saved.payload;
     try {
       const board = await buildBoard(dateYmd);
@@ -449,7 +513,7 @@ async function predictionsFor(dateYmd, limit, opts = {}) {
     return { ...payload, cache: { savedAt: new Date(saved.savedAt).toISOString(), ageSec: Math.round(age / 1000), refreshing, day: DAYBOOK.dayKey() } };
   }
   const fresh = await freshPredictions(dateYmd, limit);
-  return { ...fresh, cache: { savedAt: new Date().toISOString(), ageSec: 0, refreshing: false, day: DAYBOOK.dayKey() } };
+  return { ...fresh, cache: { savedAt: new Date().toISOString(), ageSec: 0, refreshing: restRuns.has(dateYmd), day: DAYBOOK.dayKey() } };
 }
 
 function brief(m) {
@@ -502,15 +566,16 @@ async function strongestDay(dateYmd, limit, opts = {}) {
   const key = `${dateYmd}|${limit}`;
   const ttl = STR.CFG.dayCacheMinutes * 60 * 1000;
   const hit = strongestCache.get(key);
-  if (!opts.refresh && hit && Date.now() - hit.at < ttl) return hit.value;
+  if (!opts.refresh && hit && Date.now() - hit.at < ttl) return restRuns.has(dateYmd) ? { ...hit.value, cache: { savedAt: new Date(hit.at).toISOString(), ageSec: Math.round((Date.now() - hit.at) / 1000), refreshing: true } } : hit.value;
   // the day book: answer at once, rebuild in the background when stale
   const saved = opts.refresh ? null : DAYBOOK.getPayload('strongest', isoFromYmd(dateYmd));
   if (saved) {
     const age = Date.now() - saved.savedAt;
     if (age >= ttl) freshStrongest(dateYmd, limit).catch(() => null);
-    return { ...saved.payload, cache: { savedAt: new Date(saved.savedAt).toISOString(), ageSec: Math.round(age / 1000), refreshing: age >= ttl } };
+    return { ...saved.payload, cache: { savedAt: new Date(saved.savedAt).toISOString(), ageSec: Math.round(age / 1000), refreshing: age >= ttl || restRuns.has(dateYmd) } };
   }
-  return freshStrongest(dateYmd, limit);
+  const day = await freshStrongest(dateYmd, limit);
+  return restRuns.has(dateYmd) ? { ...day, cache: { savedAt: new Date().toISOString(), ageSec: 0, refreshing: true } } : day;
 }
 async function buildStrongest(dateYmd, limit, opts = {}) {
   const day = await strongestDay(dateYmd, limit, opts);
@@ -536,16 +601,17 @@ async function betbuilderDay(dateYmd, limit, opts = {}) {
   const key = `${dateYmd}|${limit}`;
   const ttl = STR.CFG.dayCacheMinutes * 60 * 1000;
   const hit = builderCache.get(key);
-  if (!opts.refresh && hit && Date.now() - hit.at < ttl) return hit.value;
+  if (!opts.refresh && hit && Date.now() - hit.at < ttl) return restRuns.has(dateYmd) ? { ...hit.value, cache: { savedAt: new Date(hit.at).toISOString(), ageSec: Math.round((Date.now() - hit.at) / 1000), refreshing: true } } : hit.value;
   const saved = opts.refresh ? null : DAYBOOK.getPayload('betbuilder', isoFromYmd(dateYmd));
   if (saved) {
     const age = Date.now() - saved.savedAt;
     if (age >= ttl) freshStrongest(dateYmd, limit).catch(() => null);
-    return { ...saved.payload, cache: { savedAt: new Date(saved.savedAt).toISOString(), ageSec: Math.round(age / 1000), refreshing: age >= ttl } };
+    return { ...saved.payload, cache: { savedAt: new Date(saved.savedAt).toISOString(), ageSec: Math.round(age / 1000), refreshing: age >= ttl || restRuns.has(dateYmd) } };
   }
   await freshStrongest(dateYmd, limit);
   const fresh = builderCache.get(key);
-  return fresh ? fresh.value : { builders: [], matches: [], error: 'The bet builders could not be built for this date.' };
+  if (!fresh) return { builders: [], matches: [], error: 'The bet builders could not be built for this date.' };
+  return restRuns.has(dateYmd) ? { ...fresh.value, cache: { savedAt: new Date().toISOString(), ageSec: 0, refreshing: true } } : fresh.value;
 }
 async function buildBetBuilder(dateYmd, limit, opts = {}) {
   const day = await betbuilderDay(dateYmd, limit, opts);
@@ -684,8 +750,9 @@ const server = http.createServer(async (req, res) => {
 
     if (p === '/api/methodology') {
       return json(res, 200, {
-        version: '5.0',
+        version: '5.1',
         config: MI.core.CFG,
+        tiers: BACKTEST.tiers || [],
         methods: MI.SPECS.map((s) => ({
           id: s.id, name: s.name, version: s.version, family: s.family,
           floor: s.floor, minRatio: s.minRatio || null, minSample: s.minSample || MI.core.CFG.minSample,
@@ -693,7 +760,7 @@ const server = http.createServer(async (req, res) => {
           headline: s.headline !== false, canLock: s.canLock !== false,
           backtest: BACKTEST.methods[s.id] || null,
         })),
-        backtest: { dataset: BACKTEST.dataset, heldOut: BACKTEST.heldOut, fixtures: BACKTEST.fixtures, headline: BACKTEST.headline, general: BACKTEST.general },
+        backtest: { dataset: BACKTEST.dataset, heldOut: BACKTEST.heldOut, fixtures: BACKTEST.fixtures, rule: BACKTEST.rule || null, headline: BACKTEST.headline, general: BACKTEST.general },
       });
     }
 

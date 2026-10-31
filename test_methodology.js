@@ -266,7 +266,29 @@ t(`400 random fixtures evaluated without a crash (${total})`, crashes === 0 && t
 t('no two predictions on one fixture contradict each other', contradictions === 0, `${contradictions} contradictions`);
 t('a LOCK always has a real price with the required edge', locksWithoutPrice === 0, `${locksWithoutPrice}`);
 t('GG/NG 2+ is never a LOCK', gg2Locks === 0);
-t(`selective: ${predictedFixtures}/${total} fixtures get any prediction`, predictedFixtures < total * 0.75, `${predictedFixtures}/${total}`);
+// v5.1 (checklist bar 0.70): on real fixtures 63% get a methodology pick (research/methods_audit.js,
+// 12,538 of 19,991 held-out); these random fixtures are more lopsided than real ones
+t(`selective: ${predictedFixtures}/${total} fixtures get any prediction`, predictedFixtures < total * 0.9, `${predictedFixtures}/${total}`);
+
+// v5.1: tiers are a pick's chance; the checklist qualifies at 70% (draw and correct score 85%)
+{
+  t('tiers by chance: Diamond 80%+, Gold 70-80%, Silver 60-70%, Bronze 50-60%, long shot under 50%',
+    core.tierFor(0.84) === 'Diamond' && core.tierFor(0.8) === 'Diamond' && core.tierFor(0.75) === 'Gold' && core.tierFor(0.65) === 'Silver' && core.tierFor(0.55) === 'Bronze' && core.tierFor(0.31) === 'Long shot' && core.tierFor(null) === 'Long shot');
+  const V = {
+    markets: { O2: { key: 'O2', prob: 0.72, price: 1.3, priceSource: 'synthetic' } },
+    sides: { home: { n: 10, sample: 10 }, away: { n: 10, sample: 10 } },
+    coverage: { basis: 'test', sample: { home: 10, away: 10 }, xg: false, newsScanned: false, odds1x2: false },
+    v5: false,
+  };
+  // three of four checks pass: 0.75 of the checklist
+  const spec = (extra) => ({ id: 'x', name: 'X', floor: 0.6, marketKey: 'O2', build: () => ({ gates: [], checklist: [core.C('a', 'a', 1), core.C('b', 'b', 1), core.C('c', 'c', 1), core.C('d', 'd', 0)] }), ...extra });
+  const r = core.evaluateCandidate(spec(), V, { key: 'O2' });
+  t('75% of the checklist now qualifies', r.status === 'PREDICT' && r.qualifies && r.checklist.need === 0.7, `${r.status} ${r.checklist.ratio}`);
+  t('the tier follows the chance (72% -> Gold)', r.tier === 'Gold');
+  const d = core.evaluateCandidate(spec({ qualify: 0.85 }), V, { key: 'O2' });
+  t('a methodology that keeps the 85% bar (draw, correct score) does not qualify at 75%', d.status === 'WATCH' && !d.qualifies);
+  t('draw and correct score keep the 85% bar', MI.BY_ID.draw.qualify === 0.85 && MI.BY_ID.correctScore.qualify === 0.85 && MI.BY_ID.over25.qualify == null);
+}
 
 // conflict resolution on a forced collision
 const fake = (id, key, score) => ({ id, name: id, pick: { key, label: id }, status: 'PREDICT', score, qualifies: true });

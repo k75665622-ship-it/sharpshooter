@@ -264,6 +264,22 @@ global.fetch = async (input, init) => {
     const board = await get(`/api/matches?date=${day}`);
     t('board lists the two fixtures', board.status === 200 && board.body.totalMatches === 2, JSON.stringify(board.body).slice(0, 200));
 
+    // every match of the day: the first pass answers at once, the rest is analysed in the background
+    // (here the first pass is one match, so the other one is "the rest")
+    const p1 = (await get(`/api/predictions?date=${day}&limit=1&refresh=1`)).body;
+    t('the first pass answers at once and says the rest of the day is still being analysed', p1.dayCoverage && p1.dayCoverage.toPlay === 2 && p1.dayCoverage.pending === 1 && p1.cache.refreshing === true, JSON.stringify({ cov: p1.dayCoverage, cache: p1.cache, err: p1.error }));
+    let pAll = null;
+    for (let k = 0; k < 120 && !(pAll && pAll.general && pAll.general.length === 2 && !pAll.cache.refreshing); k++) {
+      await new Promise((r) => setTimeout(r, 500));
+      pAll = (await get(`/api/predictions?date=${day}&limit=1`)).body;
+    }
+    t('...then every match still to play is in', pAll && pAll.general.length === 2 && pAll.dayCoverage.pending === 0 && pAll.dayCoverage.analysed === 2 && !pAll.cache.refreshing, JSON.stringify(pAll && { n: pAll.general.length, cov: pAll.dayCoverage, cache: pAll.cache }));
+    t('the day carries the tiers and their measured record', Array.isArray(pAll.tiers) && pAll.tiers.map((x) => x.name).join(',') === 'Diamond,Gold,Silver,Bronze,Long shot' && pAll.tiers[0].heldOut.n > 500 && pAll.tiers[0].heldOut.hitRate > 0.8);
+    // every methodology verdict (qualifying or not) carries the tier of its chance
+    const tiered = (await get(`/api/analysis?league=eng.1&event=9001&date=${day}`)).body.methodology.all.filter((r) => r.prob != null);
+    const tierOfP = (p) => (p >= 0.8 ? 'Diamond' : p >= 0.7 ? 'Gold' : p >= 0.6 ? 'Silver' : p >= 0.5 ? 'Bronze' : 'Long shot');
+    t('every methodology verdict carries the tier of its chance', tiered.length > 5 && tiered.every((r) => r.tier === tierOfP(r.prob)), JSON.stringify(tiered.map((r) => [r.prob, r.tier])));
+
     const rep = (await get(`/api/analysis?league=eng.1&event=9001&date=${day}`)).body;
     t('fixture is analysable', rep.analysable === true, rep.reason || rep.error);
     t('all 13 methodologies evaluated', rep.methodology && rep.methodology.all.length === 13, rep.methodology && rep.methodology.error);
@@ -383,7 +399,7 @@ global.fetch = async (input, init) => {
     t('bet builder: track record CSV, legs included', typeof bbCsv.body === 'string' && bbCsv.body.startsWith('date,league,home,away,size') && bbCsv.body.split('\n').length >= 1 + bb.builders.length && / \| /.test(bbCsv.body), String(bbCsv.body).slice(0, 200));
 
     const meth = (await get('/api/methodology')).body;
-    t('methodology endpoint is v5 with backtest numbers', meth.version === '5.0' && meth.backtest && meth.backtest.headline && meth.backtest.headline.v5.n > 1000);
+    t('methodology endpoint is v5.1 with backtest numbers and the tiers', meth.version === '5.1' && meth.config.qualify === 0.7 && meth.backtest && meth.backtest.headline && meth.backtest.headline.v5.n > 1000 && meth.tiers.length === 5);
 
     const led = (await get('/api/ledger')).body;
     t('ledger recorded the pre-match predictions', led.entries >= 2, JSON.stringify(led).slice(0, 200));
@@ -402,7 +418,7 @@ global.fetch = async (input, init) => {
     if (JSDOM) {
       const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8').replace('<script src="/app.js"></script>', '').replace('<script src="/strongest.js"></script>', '')
         .replace('<script src="/shared.js"></script>', '').replace('<script src="/daycache.js"></script>', '').replace('<script src="/banker.js"></script>', '')
-        .replace('<script src="/betbuilder-core.js"></script>', '').replace('<script src="/betbuilder.js"></script>', '');
+        .replace('<script src="/betbuilder-core.js"></script>', '').replace('<script src="/betbuilder.js"></script>', '').replace('<script src="/tiers.js"></script>', '');
       const errors = [];
       const dom = new JSDOM(html, { url: base + '/', runScripts: 'dangerously', pretendToBeVisual: true });
       const w = dom.window;
@@ -424,7 +440,7 @@ global.fetch = async (input, init) => {
       const sc3 = w.document.createElement('script');
       sc3.textContent = fs.readFileSync(path.join(__dirname, '..', 'public', 'banker.js'), 'utf8');
       w.document.body.appendChild(sc3);
-      for (const f of ['betbuilder-core.js', 'betbuilder.js']) {
+      for (const f of ['betbuilder-core.js', 'betbuilder.js', 'tiers.js']) {
         const s4 = w.document.createElement('script');
         s4.textContent = fs.readFileSync(path.join(__dirname, '..', 'public', f), 'utf8');
         w.document.body.appendChild(s4);
@@ -436,7 +452,7 @@ global.fetch = async (input, init) => {
       const board = w.document.querySelector('#board').textContent;
       t('Matches tab lists the fixtures', /Arsenal/.test(board) && /Sunderland/.test(board), board.slice(0, 200));
       t('Matches tab shows predicted score chips', w.document.querySelectorAll('.sc-chip').length === 2);
-      for (const view of ['banker', 'strongest', 'betbuilder', 'predictions', 'top', 'general', 'acca', 'record', 'method']) {
+      for (const view of ['banker', 'strongest', 'betbuilder', 'tiers', 'predictions', 'top', 'general', 'acca', 'record', 'method']) {
         w.eval(`setView(${JSON.stringify(view)})`);
         await settle(1200);
         const txt = w.document.querySelector('#board').textContent;
@@ -446,6 +462,40 @@ global.fetch = async (input, init) => {
           w.document.querySelector('[data-group="Corners"]').click();
           await settle(50);
           t('Strongest Picks market filter shows one row per match', w.document.querySelectorAll('.sp-row').length === 2);
+        }
+        if (view === 'tiers') {
+          const D = w.document;
+          const heads = [...D.querySelectorAll('.tr-head')];
+          t('Tiers tab shows the five tiers with their measured record', /Every methodology pick, by its chance of winning/.test(txt) && heads.length === 5 && heads.map((h) => h.dataset.tier).join(',') === 'Diamond,Gold,Silver,Bronze,Long shot' && /won \d+\.\d% on past matches/.test(txt), txt.slice(0, 200));
+          const sum = heads.reduce((a, h) => a + Number(h.querySelector('.tr-count b').textContent), 0);
+          const want = w.eval("Object.values(state.preds.byMethod).flat().filter((it) => ['LOCK', 'PREDICT'].includes(it.prediction.status)).length");
+          t('every qualifying methodology pick of the day is in exactly one tier', sum === want, `${sum} v ${want}`);
+          // a day with picks in several tiers (the two test fixtures give few): the page's own grouping
+          const real = w.eval('state.preds');
+          w.__real = real;
+          const mk = (id, name, key, label, prob, matchId, status = 'PREDICT') => ({ match: { ...real.general[matchId === '9001' ? 0 : 1].match, id: matchId }, prediction: { id, name, status, prob, fairOdds: 1 / prob, pick: { key, label }, price: { state: 'unpriced' } } });
+          w.__fake = { ...real, byMethod: {
+            homeWin: [mk('homeWin', 'Home Win', '1', 'Arsenal to win', 0.83, '9001')],
+            teamGoals: [mk('teamGoals', 'Team Total Goals', 'TTA_U1.5', 'Leeds Under 1.5', 0.81, '9001'), mk('teamGoals', 'Team Total Goals', 'TTH_O1.5', 'Sunderland Over 1.5', 0.55, '9002')],
+            over25: [mk('over25', 'Over 2.5 Goals', 'O2.5', 'Over 2.5 goals', 0.66, '9002')],
+            doubleChance: [mk('doubleChance', 'Double Chance', '1X', 'Sunderland or Draw', 0.74, '9002', 'LOCK')],
+            draw: [mk('draw', 'Draw', 'X', 'Draw', 0.31, '9002')],
+            gg2: [mk('gg2', 'GG/NG 2+', 'GG2P', 'GG 2+', 0.25, '9002', 'PAPER')],
+          } };
+          w.eval('state.preds = window.__fake; window.renderTiers();');
+          await settle(20);
+          const count = (name) => Number(D.querySelector(`.tr-head[data-tier="${name}"] .tr-count b`).textContent);
+          t('picks land in the tier of their chance (paper-only picks stay out)', count('Diamond') === 2 && count('Gold') === 1 && count('Silver') === 1 && count('Bronze') === 1 && count('Long shot') === 1, ['Diamond', 'Gold', 'Silver', 'Bronze', 'Long shot'].map(count).join(','));
+          const open = [...D.querySelectorAll('.tr-tier.is-open')];
+          t('Diamond opens first, its methodologies and matches listed', open.length === 1 && open[0].classList.contains('tr-diamond') && open[0].querySelectorAll('.tr-group').length === 2 && open[0].querySelectorAll('.tr-row').length === 2 && /Arsenal to win/.test(open[0].textContent), open.map((s) => s.className).join(' '));
+          const gold = D.querySelector('.tr-head[data-tier="Gold"]');
+          gold.click();
+          await settle(20);
+          t('clicking a tier opens it (drop-down)', gold.getAttribute('aria-expanded') === 'true' && !gold.closest('.tr-tier').querySelector('.tr-body').hidden && /Sunderland or Draw/.test(gold.closest('.tr-tier').textContent));
+          D.querySelector('[data-m="over25"]').click();
+          await settle(20);
+          t('a market filter keeps only that methodology', count('Silver') === 1 && count('Diamond') === 0 && count('Gold') === 0);
+          w.eval('state.preds = window.__real; window.__real = null; window.__fake = null;');
         }
         if (view === 'betbuilder') {
           const D = w.document;

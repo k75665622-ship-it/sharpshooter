@@ -32,7 +32,7 @@ below** their stated probability. Keep respecting it.
 | **NEWS** | Rules 15, 18, 19 · pre-flight #2, #6, #7 | No rotation (< 3 days' rest), no side missing ≥ 25% of its attacking output (FPL), not attackers missing on both sides, no mass absences, no key departure or manager change |
 | **STREAK** | Rules 20, 27 | An Over streak of 4+ must be backed by a model total ≥ 2.6 |
 
-## ✅ CHECKLIST (≥ 85% of the known items must pass)
+## ✅ CHECKLIST (≥ 70% of the known items must pass — v5.1; it was 85%)
 
 | Item | Pass at |
 |---|---|

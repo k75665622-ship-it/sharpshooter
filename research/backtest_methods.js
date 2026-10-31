@@ -99,7 +99,8 @@ for (const div of Object.keys(byDiv)) {
       rows.push({
         div, season, date: fx.date, home: fx.home, away: fx.away, id: r.id, key: r.pick.key, status: r.status, kept: out.predictions.includes(r), headline: out.headline === r,
         prob: r.prob, model: r.modelProb, hit, b365, max, priceState: r.price && r.price.state,
-        ...(process.env.DIAG && process.env.DIAG.split(',').includes(r.id) ? {
+        score: r.score, tier: r.tier, ratio: r.checklist ? +r.checklist.ratio.toFixed(3) : null, failed: r.failedGates && r.failedGates.length ? r.failedGates : undefined,
+        ...(process.env.DIAG && (process.env.DIAG === 'all' || process.env.DIAG.split(',').includes(r.id)) ? {
           gates: Object.fromEntries(r.gates.map((g) => [g.id, g.unknown ? null : g.pass ? 1 : 0])),
           items: Object.fromEntries(r.checklist.items.map((c) => [c.id, c.unknown ? null : +c.score.toFixed(2)])),
         } : {}),

@@ -983,14 +983,15 @@ function predStatus(d) {
   const s = d.summary || {};
   const mp = s.main || {};
   const done = (mp.won || 0) + (mp.lost || 0);
+  const more = d.dayCoverage && d.dayCoverage.pending ? d.dayCoverage.pending : 0;
   return `${(d.general || []).length} fixtures predicted · ${d.predicted} methodology picks`
     + (done ? ` · main picks ${mp.won} ✓ ${mp.lost} ✕` : '')
-    + (d.cache && d.cache.refreshing ? ' · updating…' : '');
+    + (more ? ` · ${more} more matches being analysed…` : d.cache && d.cache.refreshing ? ' · updating…' : '');
 }
 
 function rerenderViews() {
   if (state.view === 'matches') renderBoard();
-  else if (['predictions', 'top', 'general', 'acca', 'banker'].includes(state.view)) renderPredView();
+  else if (['predictions', 'top', 'general', 'acca', 'banker', 'tiers'].includes(state.view)) renderPredView();
 }
 
 async function loadPredictions(force) {
@@ -1025,7 +1026,8 @@ function fetchPredictions(date, force) {
     setStatus(predStatus(merged), merged.cache && merged.cache.refreshing ? 'busy' : 'ok');
     // the server answered from its own day book and is rebuilding the day: ask again shortly
     clearTimeout(DAY.pollTimer);
-    if (merged.cache && merged.cache.refreshing && DAY.polls < 8) {
+    // (longer while the rest of a busy day is still being analysed in the background)
+    if (merged.cache && merged.cache.refreshing && DAY.polls < (merged.dayCoverage && merged.dayCoverage.pending ? 30 : 8)) {
       DAY.polls++;
       DAY.pollTimer = setTimeout(() => {
         if (state.date === date) fetchPredictions(date, false).then((d) => { if (d) rerenderViews(); }).catch(() => {});
@@ -1214,6 +1216,7 @@ async function renderMethod() {
       <h3>What the evidence says — plainly</h3>
       <ul>
         <li><b>The percentages are honest.</b> Across every methodology the held-out hit rate sits close to the stated probability.</li>
+        <li><b>v5.1: the checklist never decided how often a pick won.</b> Replayed on 46,075 matches, picks that pass every hard gate won as often as their probability said whether 70% or 90% of their checklist agreed. The 85% bar was hiding about a third of the matches that fit a methodology, so 70% now qualifies (the draw and correct score keep 85%: for draws the checklist does help). A pick's tier is now its chance of winning — Diamond 80%+, Gold 70-80%, Silver 60-70%, Bronze 50-60% — see the Tiers tab.</li>
         <li><b>Accuracy is not profit.</b> At Bet365 prices no methodology made a reliable profit; with the best price across ~17 books several are around break-even or slightly positive. Always shop for the price, and never bet below the "take at" price shown.</li>
         <li><b>The bookmakers are the sharpest forecast.</b> When our independent model disagrees with them, the bookmakers were usually right — so disagreement is shown as a warning, not as value.</li>
         <li><b>GG/NG 2+ stays paper-only</b> until the live track record shows 40 settled legs at or above their stated probability with a profit.</li>
@@ -1466,6 +1469,7 @@ function renderPredView() {
   else if (state.view === 'general') renderGeneral();
   else if (state.view === 'acca') renderAcca();
   else if (state.view === 'banker' && window.renderBanker) window.renderBanker();
+  else if (state.view === 'tiers' && window.renderTiers) window.renderTiers();
 }
 
 async function refresh() {
@@ -1606,7 +1610,7 @@ function scheduleRefresh() {
   refreshTimer = setInterval(() => {
     if (document.hidden || state.loadingDetail) return;
     // the board is cheap: it carries live and final scores onto the saved predictions
-    if (['matches', 'predictions', 'top', 'general', 'acca', 'banker'].includes(state.view)) loadBoard();
+    if (['matches', 'predictions', 'top', 'general', 'acca', 'banker', 'tiers'].includes(state.view)) loadBoard();
   }, 60000);
 }
 

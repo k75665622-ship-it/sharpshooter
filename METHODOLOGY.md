@@ -38,8 +38,15 @@ v2.5 personal playbooks, one per market — are in [`methodology/`](methodology/
 2. **Calibrated numbers** (Rule 40). Every market probability is calibrated on real results and was checked on
    seasons the calibration never saw. A stated 65% lands about 65% of the time.
 3. **Hard gates.** Every gate must pass. Unknown evidence fails (fail closed).
-4. **Checklist.** At least 85% of the known items must pass, with at least 60% of items known. Every checklist
-   includes the **independent witness** (Rule 42): the model with no price in it must not contradict the pick.
+4. **Checklist.** At least **70%** of the known items must pass (v5.1; the draw and the final score keep 85%), with
+   at least 60% of items known. Every checklist includes the **independent witness** (Rule 42): the model with no
+   price in it must not contradict the pick. v5.1 lowered the bar from 85% because, replayed on 46,075 matches, picks
+   that pass every hard gate won as often as their probability said whatever share of the checklist agreed — the 85%
+   bar was hiding about a third of the matches that fit a methodology without making the rest any surer
+   ([`research/RESULTS.md`](research/RESULTS.md), v5.1 audit).
+4b. **Tier = chance** (v5.1). Every pick lands in a tier by its probability: **Diamond** 80%+, **Gold** 70-80%,
+   **Silver** 60-70%, **Bronze** 50-60%, long shot under 50%. Held-out 2023-26 they won 85.6%, 76.3%, 65.1%, 56.6%
+   and 30.3% (stated 84.3%, 75.3%, 64.6%, 57.8%, 31.0%). The Tiers tab lists the day's picks by tier.
 5. **Status ladder.**
    - **LOCK** — qualifies **and** a real bookmaker price beats the multi-book fair price by ≥ 3% (30–75% band,
      ≥ 2 books). (Rule 39)
@@ -69,24 +76,24 @@ v2.5 personal playbooks, one per market — are in [`methodology/`](methodology/
 | Cross-verified results from 3 free sources (Rule 41) | Caught 97 wrong League Two scores and 2 wrong Portuguese results in openfootball. |
 | Premier League availability from Fantasy Premier League | Real chance-of-playing %, replacing headline guessing for that league. |
 
-## The record (held-out 2023-26, v5 code vs v4 code on the same matches)
+## The record (held-out 2023-26, the same matches)
 
-| Methodology | v5 hit (stated) · picks | v4 hit (stated) · picks |
-|---|---|---|
-| Strongest pick per fixture | **71.6% (70.9%) · 9,114** | 66.7% (67.7%) · 6,577 |
-| Over 2.5 | 64.7% (65.5%) · 2,499 | 62.4% (62.0%) · 2,105 |
-| Under 2.5 | 61.7% (64.1%) · 925 | 57.5% (61.5%) · 532 |
-| BTTS Yes | 63.9% (62.1%) · 1,121 | 61.7% (61.0%) · 957 |
-| BTTS No | 57.4% (60.4%) · 61 | 60.6% (59.7%) · 33 |
-| Team Totals | 68.5% (68.9%) · 2,635 | 66.7% (70.9%) · 1,733 |
-| Home Win | 77.7% (75.8%) · 1,574 | 78.8% (75.3%) · 198 |
-| Away Win | 74.7% (72.6%) · 635 | 75.0% (71.3%) · 100 |
-| Draw | 31.4% (32.2%) · 245 | 33.5% (31.3%) · 206 |
-| Underdog + | 75.9% (72.8%) · 2,097 | 70.4% (71.8%) · 2,273 |
-| Favourite − | 70.4% (68.5%) · 477 | 67.0% (67.4%) · 109 |
-| Double Chance | 77.0% (76.0%) · 1,783 | — |
-| Final Score (exact) | 17.6% (15.0%) · 437 | — |
-| General best bet, every fixture | 73.6% (72.7%) · 19,043 | — |
+| Methodology | **v5.1** hit (stated) · picks | v5.0 (85% checklist) | v4 |
+|---|---|---|---|
+| Strongest pick per fixture | **72.1% (71.5%) · 12,538** | 71.6% (70.9%) · 9,114 | 66.7% (67.7%) · 6,577 |
+| Over 2.5 | 64.8% (65.1%) · 3,057 | 64.7% (65.5%) · 2,499 | 62.4% (62.0%) · 2,105 |
+| Under 2.5 | 61.8% (63.7%) · 1,558 | 61.7% (64.1%) · 925 | 57.5% (61.5%) · 532 |
+| BTTS Yes | 63.2% (61.9%) · 1,300 | 63.9% (62.1%) · 1,121 | 61.7% (61.0%) · 957 |
+| BTTS No | 60.3% (60.3%) · 146 | 57.4% (60.4%) · 61 | 60.6% (59.7%) · 33 |
+| Team Totals | 68.1% (68.6%) · 4,457 | 68.5% (68.9%) · 2,635 | 66.7% (70.9%) · 1,733 |
+| Home Win | 75.7% (74.8%) · 2,526 | 77.7% (75.8%) · 1,574 | 78.8% (75.3%) · 198 |
+| Away Win | 75.7% (72.5%) · 913 | 74.7% (72.6%) · 635 | 75.0% (71.3%) · 100 |
+| Draw | 31.4% (32.2%) · 245 | 31.4% (32.2%) · 245 | 33.5% (31.3%) · 206 |
+| Underdog + | 74.0% (72.4%) · 3,657 | 75.9% (72.8%) · 2,097 | 70.4% (71.8%) · 2,273 |
+| Favourite − | 70.7% (67.5%) · 721 | 70.4% (68.5%) · 477 | 67.0% (67.4%) · 109 |
+| Double Chance | 77.0% (76.0%) · 3,233 | 77.0% (76.0%) · 1,783 | — |
+| Final Score (exact) | 17.6% (15.0%) · 437 | 17.6% (15.0%) · 437 | — |
+| General best bet, every fixture | 73.3% (72.5%) · 18,788 | 73.6% (72.7%) · 19,043 | — |
 
 ## What the tests do NOT show
 - **Profit.** At Bet365 prices no methodology made a reliable profit; at the best of ~17 books several were
