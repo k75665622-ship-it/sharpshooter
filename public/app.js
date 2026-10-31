@@ -1470,6 +1470,7 @@ function renderPredView() {
 
 async function refresh() {
   if (state.view === 'strongest') return window.renderStrongest && window.renderStrongest(true);
+  if (state.view === 'betbuilder') return window.renderBetBuilder && window.renderBetBuilder(true);
   if (state.view === 'method') return renderMethod();
   if (state.view === 'record') return renderRecord();
   if (state.view === 'matches') {
@@ -1490,9 +1491,29 @@ async function refresh() {
   }
 }
 
+/* The tab row scrolls sideways when it does not fit: fade the cut edge, keep the active tab in view. */
+function tabsEdge() {
+  const t = $('#tabs');
+  if (!t) return;
+  const max = t.scrollWidth - t.clientWidth;
+  t.classList.toggle('is-cut-l', max > 1 && t.scrollLeft > 1);
+  t.classList.toggle('is-cut-r', max > 1 && t.scrollLeft < max - 1);
+}
+function revealTab() {
+  const t = $('#tabs');
+  const a = $('.tab.is-active');
+  if (!t || !a || !a.getBoundingClientRect) return;
+  const tr = t.getBoundingClientRect();
+  const ar = a.getBoundingClientRect();
+  if (ar.left < tr.left) t.scrollLeft -= tr.left - ar.left + 24;
+  else if (ar.right > tr.right) t.scrollLeft += ar.right - tr.right + 24;
+  tabsEdge();
+}
+
 function setView(view) {
   state.view = view;
   $$('.tab').forEach((t) => t.classList.toggle('is-active', t.dataset.view === view));
+  revealTab();
   $('#bankersOnly').parentElement.style.display = view === 'matches' ? '' : 'none';
   $('.datebar').classList.toggle('is-muted', view === 'method' || view === 'record');
 
@@ -1500,6 +1521,7 @@ function setView(view) {
   if (view === 'method') { renderMethod(); return; }
   if (view === 'record') { renderRecord(); return; }
   if (view === 'strongest') { if (window.renderStrongest) window.renderStrongest(); return; }
+  if (view === 'betbuilder') { if (window.renderBetBuilder) window.renderBetBuilder(); return; }
 
   renderPredView(); // shows the loading block until data arrives (a saved copy appears at once)
   loadPredictions(false)
@@ -1539,6 +1561,9 @@ function init() {
   $('#dateInput').addEventListener('change', (e) => e.target.value && setDate(e.target.value));
   $$('.quick').forEach((q) => q.addEventListener('click', () => setDate(shiftDate(todayISO(), Number(q.dataset.offset)))));
   $$('.tab').forEach((t) => t.addEventListener('click', () => setView(t.dataset.view)));
+  $('#tabs').addEventListener('scroll', tabsEdge, { passive: true });
+  window.addEventListener('resize', tabsEdge);
+  tabsEdge();
   $('#scrim').addEventListener('click', closeDetail);
 
   $('#bankersOnly').addEventListener('change', (e) => {

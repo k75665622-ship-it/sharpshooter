@@ -102,6 +102,18 @@ button, input, select { font-family: inherit; font-size: inherit; color: inherit
 }
 .tab:hover { background: var(--surface-3); color: var(--text); }
 .tab.is-active { background: var(--accent); color: #fff; box-shadow: var(--shadow-sm); }
+/* ten tabs: on a narrower screen they scroll sideways instead of pushing the page wider */
+.tabs { min-width: 0; overflow-x: auto; scrollbar-width: none; padding: 3px 0; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { flex: 0 0 auto; white-space: nowrap; }
+.tabs.is-cut-r { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent); }
+.tabs.is-cut-l { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 40px), transparent); }
+.tabs.is-cut-l.is-cut-r { -webkit-mask-image: linear-gradient(to right, transparent, #000 40px, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(to right, transparent, #000 40px, #000 calc(100% - 40px), transparent); }
+#statusText { display: inline-block; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+@media (max-width: 1440px) {
+  .topbar { gap: 14px; }
+  .tab { padding: 7px 11px; font-size: 12.5px; }
+}
 
 .status {
   display: flex;

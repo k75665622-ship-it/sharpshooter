@@ -191,3 +191,55 @@ for the page.
 landing rate (36.1% → 33.0%), and the possession check lowered it further (30.8-33.1%), so neither is used. A safer
 2.0+ slip from the same bankers lands far more often — 2019-23: 49.2% (stated 48.2%, 3.2 legs); **held-out 48.9%**
 (stated 46.9%, 650 slips) against 33.6% for the 3.0+ slip — at a lower return (−1.0% against +0.8% held-out).
+
+## 8. Bet Builder: several selections from one match at 3.0+ odds
+
+`betbuilder_study.js` replays the **production** Bet Builder (`lib/betbuilder.js`, `public/betbuilder-core.js`) on
+the same 76,528 priced matches from July 2019, walk-forward. Each match is priced as on the site: the de-vigged Bet365
+1X2 + over/under 2.5 price through `lib/ensemble.js` (calibration fitted on 2019-23), the possession view, and the
+form + price corner and card models; every leg is settled on the full-time score, corners and cards, and a builder
+lands only when every leg does. The joint model gives each builder one combined chance (the score grid for goal legs,
+corners and cards independent of the goals, each leg nudged to its measured chance).
+
+| | Tuning 2019-23 | **Held-out 2023-26** |
+|---|---|---|
+| Priced matches / with a builder | 47,337 / 26,865 (57%) | 29,191 / 21,063 (72%) |
+| Builders a match day | 19.7 | 22.3 |
+| **Landed (stated)** | 32.7% (32.8%) | **32.7% (32.8%)** |
+| Stated 32-34% | 32.7% (32.9%) — 24,240 | 32.9% (32.9%) — 19,082 |
+| Stated 30-32% | 32.0% (31.5%) — 2,568 | 30.1% (31.5%) — 1,936 |
+| Goals + corners + cards | 33.2% (32.7%) — 11,086 | 32.9% (32.7%) — 10,124 |
+| Goals + corners | 32.2% (32.8%) — 13,642 | 32.3% (32.8%) — 9,188 |
+| Goals + cards / corners + cards | 33.1% / 32.4% (32.8% / 33.0%) | 33.5% / 32.4% (32.9% / 33.0%) |
+| Goals only | 27.9% (32.5%) — 61 | 25.0% (32.6%) — 52 |
+| 3 / 4 / 5 legs | 32.7% / 33.9% / 34.6% | 32.6% / 35.3% / 24.0% (20,787 / 249 / 25) |
+
+Each leg on its own also won its stated chance (held-out: no draw 71.0% against 70.0% stated; cards over / under
+73.4% / 73.2% against 72.5% / 72.9%; total corners over / under 71.1% / 69.8% against 70.5% / 69.9%; team corners
+68.0% and 67.8% against 68.2%; away team to score 64.4% against 65.3%; under 3.5 goals 68.8% against 68.2%; both
+teams to score 59.6% against 60.1%).
+
+What the numbers say:
+
+- **The combined chance is right.** Builders mixing goals, corners and cards landed as stated in both periods, so
+  treating the three as independent holds at this level. Goals-only builders landed below their stated chance in both
+  periods (113 builders in all, 0.3% of the total; about 1.4 standard errors) — too few to change the rule, worth
+  watching in the live record.
+- **No builder calibration.** Fitting logit(landed) = a + b·logit(stated) on the tuning builders gives a slope of
+  0.40, only because nearly every builder is stated between 30% and 34% — too narrow a range to fit a slope. The stated
+  chance is already right on average in both periods, so none is applied (`builder.cal` stays empty).
+- **One in three.** A 3.0+ builder loses about two times in three; it only pays over time at a price above its fair
+  odds, and bookmakers' bet builder prices carry a margin on every leg.
+
+The rule's choices were made for reasons of logic, not to raise a number: the **fewest legs** (each leg costs margin
+and is one more thing to go wrong), **no two legs of a kind pulling against each other** (a hedge looks safe leg by
+leg and rarely lands as a whole), and **no passenger legs** — a leg the others already make certain was found in 1 of
+47,928 builders and is now never used to pad a builder to three legs (the replay changed by that one builder). The
+report prints both periods together, so the held-out record is not a strictly blind test of those choices; it is a
+clean test of the combined chance, which nothing was fitted to.
+
+Limits, stated: the archive cannot rebuild the v6 factor view or the stats view, so each leg's measured chance in the
+replay rests on the price (and the possession view, weight 0), the v6 trap checks are off and the two-view rule is
+relaxed to one; and the goal, corner and card calibrations in `lib/strongest/models.json` were fitted on every season,
+so the held-out legs are slightly in-sample. Scorer legs have no history in the archive and stay out of the day's
+builders.

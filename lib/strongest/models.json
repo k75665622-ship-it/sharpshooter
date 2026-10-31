@@ -423,5 +423,72 @@
     "label": "Team over 1.5 goals"
    }
   }
+ },
+ "builder": {
+  "measured": {
+   "window": "Jul 2023 – Sept 2026",
+   "matches": 29191,
+   "builders": 21063,
+   "share": 0.722,
+   "perMatchDay": 22.3,
+   "all": {
+    "n": 21061,
+    "landed": 0.327,
+    "stated": 0.328,
+    "multiplied": 0.326
+   },
+   "kinds": {
+    "cards+corners+goals": {
+     "n": 10124,
+     "landed": 0.329,
+     "stated": 0.327,
+     "multiplied": 0.327
+    },
+    "corners+goals": {
+     "n": 9188,
+     "landed": 0.323,
+     "stated": 0.328,
+     "multiplied": 0.324
+    },
+    "cards+goals": {
+     "n": 1330,
+     "landed": 0.335,
+     "stated": 0.329,
+     "multiplied": 0.325
+    },
+    "cards+corners": {
+     "n": 367,
+     "landed": 0.324,
+     "stated": 0.33,
+     "multiplied": 0.328
+    },
+    "goals": {
+     "n": 52,
+     "landed": 0.25,
+     "stated": 0.326,
+     "multiplied": 0.275
+    }
+   },
+   "size": {
+    "3": {
+     "n": 20787,
+     "landed": 0.326,
+     "stated": 0.328,
+     "multiplied": 0.326
+    },
+    "4": {
+     "n": 249,
+     "landed": 0.353,
+     "stated": 0.327,
+     "multiplied": 0.309
+    },
+    "5": {
+     "n": 25,
+     "landed": 0.24,
+     "stated": 0.329,
+     "multiplied": 0.296
+    }
+   }
+  }
  }
 }

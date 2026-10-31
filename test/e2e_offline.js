@@ -358,6 +358,30 @@ global.fetch = async (input, init) => {
     const spCsv = await get('/api/strongest/record?format=csv');
     t('strongest: track record CSV', typeof spCsv.body === 'string' && spCsv.body.startsWith('date,kind,league'));
 
+    // ---------------------------------------------------------------- Bet Builder
+    const BBC = require('../public/betbuilder-core');
+    const bb = (await get(`/api/betbuilder?date=${day}`)).body;
+    const bbMatch = (id) => (bb.matches || []).find((m) => m.match.id === id);
+    t('bet builder: both fixtures modelled for "build your own"', (bb.matches || []).length === 2 && bb.matches.every((m) => m.model && m.model.goals.lamH > 0 && m.model.corners && m.model.cards && Object.keys(m.model.legs).length > 20), JSON.stringify(bb.error || (bb.matches || []).map((m) => m.model && Object.keys(m.model.legs).length)));
+    t('bet builder: rules, the 3.0 target and the measured record published', bb.config.target === 3 && bb.config.minLegs === 3 && bb.rules.length >= 6 && bb.config.measured && bb.config.measured.all.n > 1000);
+    t('bet builder: a builder for each fixture here', (bb.builders || []).length === 2, JSON.stringify(bb.builders));
+    t('bet builder: 3-5 measured legs of 55%+, one per market, no scorers', bb.builders.every((it) => {
+      const b = it.builder;
+      const mt = bbMatch(it.match.id);
+      return b.size >= bb.config.minLegs && b.size <= bb.config.maxLegs && new Set(b.legs.map((l) => BBC.legOf(l.key).family)).size === b.size
+        && b.legs.every((l) => l.chance >= bb.config.minLegChance && mt.model.legs[l.key] && mt.model.legs[l.key].measured && !/^PL_/.test(l.key));
+    }), JSON.stringify(bb.builders.map((b) => b.builder.legs)));
+    t('bet builder: every builder reaches 3.0+ fair odds and stays under 4.5', bb.builders.every((it) => it.builder.fairOdds >= bb.config.target - 1e-3 && it.builder.fairOdds <= bb.config.maxOdds + 1e-3), JSON.stringify(bb.builders.map((b) => b.builder.fairOdds)));
+    t('bet builder: the page\'s model gives the server\'s combined chance', bb.builders.every((it) => {
+      const j = BBC.joint(BBC.prepare(bbMatch(it.match.id).model), it.builder.legs.map((l) => l.key), bb.config.cal);
+      return j && Math.abs(j.chance - it.builder.chance) < 2e-4;
+    }));
+    t('bet builder: team under 1.5 goals stays out of the builders', bb.config.excluded.includes('TTH_U1.5') && bb.builders.every((it) => it.builder.legs.every((l) => !bb.config.excluded.includes(l.key))));
+    const bbRec = (await get('/api/betbuilder/record')).body;
+    t('bet builder: builders recorded before kick-off', bbRec.builders && bbRec.builders.pending >= bb.builders.length && bbRec.recent.length >= bb.builders.length, JSON.stringify(bbRec.builders));
+    const bbCsv = await get('/api/betbuilder/record?format=csv');
+    t('bet builder: track record CSV, legs included', typeof bbCsv.body === 'string' && bbCsv.body.startsWith('date,league,home,away,size') && bbCsv.body.split('\n').length >= 1 + bb.builders.length && / \| /.test(bbCsv.body), String(bbCsv.body).slice(0, 200));
+
     const meth = (await get('/api/methodology')).body;
     t('methodology endpoint is v5 with backtest numbers', meth.version === '5.0' && meth.backtest && meth.backtest.headline && meth.backtest.headline.v5.n > 1000);
 
@@ -377,7 +401,8 @@ global.fetch = async (input, init) => {
     }
     if (JSDOM) {
       const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8').replace('<script src="/app.js"></script>', '').replace('<script src="/strongest.js"></script>', '')
-        .replace('<script src="/shared.js"></script>', '').replace('<script src="/daycache.js"></script>', '').replace('<script src="/banker.js"></script>', '');
+        .replace('<script src="/shared.js"></script>', '').replace('<script src="/daycache.js"></script>', '').replace('<script src="/banker.js"></script>', '')
+        .replace('<script src="/betbuilder-core.js"></script>', '').replace('<script src="/betbuilder.js"></script>', '');
       const errors = [];
       const dom = new JSDOM(html, { url: base + '/', runScripts: 'dangerously', pretendToBeVisual: true });
       const w = dom.window;
@@ -399,6 +424,11 @@ global.fetch = async (input, init) => {
       const sc3 = w.document.createElement('script');
       sc3.textContent = fs.readFileSync(path.join(__dirname, '..', 'public', 'banker.js'), 'utf8');
       w.document.body.appendChild(sc3);
+      for (const f of ['betbuilder-core.js', 'betbuilder.js']) {
+        const s4 = w.document.createElement('script');
+        s4.textContent = fs.readFileSync(path.join(__dirname, '..', 'public', f), 'utf8');
+        w.document.body.appendChild(s4);
+      }
       w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
       const settle = (ms) => new Promise((r) => setTimeout(r, ms));
       w.eval(`setDate(${JSON.stringify(day)})`);
@@ -406,7 +436,7 @@ global.fetch = async (input, init) => {
       const board = w.document.querySelector('#board').textContent;
       t('Matches tab lists the fixtures', /Arsenal/.test(board) && /Sunderland/.test(board), board.slice(0, 200));
       t('Matches tab shows predicted score chips', w.document.querySelectorAll('.sc-chip').length === 2);
-      for (const view of ['banker', 'strongest', 'predictions', 'top', 'general', 'acca', 'record', 'method']) {
+      for (const view of ['banker', 'strongest', 'betbuilder', 'predictions', 'top', 'general', 'acca', 'record', 'method']) {
         w.eval(`setView(${JSON.stringify(view)})`);
         await settle(1200);
         const txt = w.document.querySelector('#board').textContent;
@@ -416,6 +446,37 @@ global.fetch = async (input, init) => {
           w.document.querySelector('[data-group="Corners"]').click();
           await settle(50);
           t('Strongest Picks market filter shows one row per match', w.document.querySelectorAll('.sp-row').length === 2);
+        }
+        if (view === 'betbuilder') {
+          const D = w.document;
+          t('Bet Builder tab shows the day\'s builders and every match', /Several selections from one match/.test(txt) && D.querySelectorAll('.bb-card.is-top').length === bb.builders.length && D.querySelectorAll('.bb-mrow').length === 2, txt.slice(0, 200));
+          t('Bet Builder tab shows the measured record', /Measured on past matches/.test(txt) && /All bet builders/.test(txt));
+          // build your own: open the first match and start from its builder
+          D.querySelector('.bb-mrow[data-open="9001"]').click();
+          await settle(50);
+          t('build your own opens with the match menu', !!D.querySelector('#bbBuild') && D.querySelectorAll('.bb-opt').length > 20);
+          D.querySelector('[data-act="suggest"]').click();
+          await settle(30);
+          const own = bb.builders.find((it) => it.match.id === '9001').builder;
+          const slip = () => D.querySelector('#bbSlip').textContent;
+          t('our builder in the slip gives the same combined chance', slip().includes(`${Math.round(own.chance * 100)}%`) && /This is the builder chosen for this match/.test(slip()) && D.querySelectorAll('.bb-opt.is-on').length === own.size, slip().slice(0, 240));
+          const tick = (key) => D.querySelector(`.bb-opt[data-key="${key}"] input`).click();
+          D.querySelector('[data-act="clear"]').click();
+          tick('U1.5');
+          tick('BTTS_Y');
+          await settle(20);
+          t('contradictory selections are flagged', /cannot both happen/.test(slip()) && D.querySelector('.bb-opt[data-key="BTTS_N"]').classList.contains('is-off') === false, slip().slice(0, 200));
+          D.querySelector('[data-act="clear"]').click();
+          tick('O1.5');
+          tick('O2.5');
+          t('one line of each market: a second line replaces the first', D.querySelectorAll('.bb-opt.is-on').length === 1 && D.querySelector('.bb-opt[data-key="O2.5"]').classList.contains('is-on'));
+          tick('1');
+          tick('TTH_O0.5');
+          await settle(20);
+          t('a leg the others already guarantee is called out', /adds nothing/.test(slip()), slip().slice(0, 240));
+          D.querySelector('[data-act="close"]').click();
+          await settle(20);
+          t('build your own closes', !D.querySelector('#bbBuild'));
         }
       }
       w.eval("openMatch('9001','eng.1','2026')");
