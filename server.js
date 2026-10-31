@@ -23,6 +23,9 @@
  *   GET /api/strongest?date=          -> Strongest Picks: nine SportyBet market groups per match, one pick per
  *                                        match when every independent view agrees (no fixed number of picks)
  *   GET /api/strongest/record[?format=csv] -> the Strongest Picks track record
+ *   GET /api/betbuilder?date=         -> Bet Builder: per match, several selections combined at 3.0+ odds from one
+ *                                        joint model of the match; every match's model and menu for "build your own"
+ *   GET /api/betbuilder/record[?format=csv] -> the bet builders' track record (written before kick-off)
  *   GET /api/banker?date=             -> High Banker: the day's safest selections (every check passed) and the
  *                                        most likely slip reaching 3.0+ odds; no upper limit, never padded
  *   GET /api/daybook                  -> the 24-hour day book (resets 05:00 Ghana time): what is stored
@@ -45,6 +48,7 @@ const ACC = require('./lib/intel/accumulator');
 const HTTPC = require('./lib/crawler/http');
 const WH = require('./lib/crawler/warehouse');
 const STR = require('./lib/strongest');
+const BL = require('./lib/betbuilder');
 const DAYBOOK = require('./lib/daybook');
 const BANKER = require('./lib/banker');
 const SS = require('./public/shared.js');
@@ -465,21 +469,30 @@ function briefFull(m) {
  */
 const strongestCache = new Map();
 const strongestInflight = new Map();
+const builderCache = new Map(); // the Bet Builder, built in the same pass
 function freshStrongest(dateYmd, limit) {
   const key = `${dateYmd}|${limit}`;
   // two visitors opening the tab at once share one build
   if (strongestInflight.has(key)) return strongestInflight.get(key);
   const p = (async () => {
     const { reports } = await analyseDay(dateYmd, limit);
-    const day = await STR.forReports(reports, { day: isoFromYmd(dateYmd) });
+    const full = await STR.forReports(reports, { day: isoFromYmd(dateYmd) });
+    // the Bet Builder is built in the same pass (lib/betbuilder.js) and kept apart
+    const { betbuilder, ...day } = full;
     try {
       STR.record.record(day);
+      if (betbuilder) STR.record.recordBuilders(betbuilder);
     } catch {
       /* the record is best-effort and must never break the page */
     }
     strongestCache.set(key, { at: Date.now(), value: day });
     if (strongestCache.size > 20) strongestCache.delete(strongestCache.keys().next().value);
     DAYBOOK.savePayload('strongest', isoFromYmd(dateYmd), day);
+    if (betbuilder) {
+      builderCache.set(key, { at: Date.now(), value: betbuilder });
+      if (builderCache.size > 20) builderCache.delete(builderCache.keys().next().value);
+      DAYBOOK.savePayload('betbuilder', isoFromYmd(dateYmd), betbuilder);
+    }
     return day;
   })().finally(() => strongestInflight.delete(key));
   strongestInflight.set(key, p);
@@ -511,6 +524,41 @@ async function buildStrongest(dateYmd, limit, opts = {}) {
     earlier: STR.record.forDate(isoFromYmd(dateYmd)).filter((e) => Date.parse(e.date) <= now).map((e) => ({
       fixture: e.fixture, date: e.date, league: e.leagueName || e.league, home: e.home, away: e.away, group: e.group, label: e.label,
       prob: e.prob, floor: e.floor, tier: e.tier, result: e.result, hit: e.hit, ht: e.ht || null,
+    })),
+  };
+}
+
+/**
+ * The Bet Builder for a day (lib/betbuilder.js): built in the Strongest Picks pass, so it shares
+ * its analysis, caches and day book.
+ */
+async function betbuilderDay(dateYmd, limit, opts = {}) {
+  const key = `${dateYmd}|${limit}`;
+  const ttl = STR.CFG.dayCacheMinutes * 60 * 1000;
+  const hit = builderCache.get(key);
+  if (!opts.refresh && hit && Date.now() - hit.at < ttl) return hit.value;
+  const saved = opts.refresh ? null : DAYBOOK.getPayload('betbuilder', isoFromYmd(dateYmd));
+  if (saved) {
+    const age = Date.now() - saved.savedAt;
+    if (age >= ttl) freshStrongest(dateYmd, limit).catch(() => null);
+    return { ...saved.payload, cache: { savedAt: new Date(saved.savedAt).toISOString(), ageSec: Math.round(age / 1000), refreshing: age >= ttl } };
+  }
+  await freshStrongest(dateYmd, limit);
+  const fresh = builderCache.get(key);
+  return fresh ? fresh.value : { builders: [], matches: [], error: 'The bet builders could not be built for this date.' };
+}
+async function buildBetBuilder(dateYmd, limit, opts = {}) {
+  const day = await betbuilderDay(dateYmd, limit, opts);
+  STR.record.settleAll().catch(() => 0);
+  const now = Date.now();
+  return {
+    ...day,
+    config: BL.publicConfig(),
+    rules: BL.rules(),
+    record: STR.record.builderSummary(),
+    earlier: STR.record.forDate(isoFromYmd(dateYmd), 'builder').filter((e) => Date.parse(e.date) <= now).map((e) => ({
+      fixture: e.fixture, date: e.date, league: e.leagueName || e.league, home: e.home, away: e.away, label: e.label,
+      prob: e.prob, fairOdds: e.fairOdds || null, legs: e.legs || [], result: e.result, hit: e.hit,
     })),
   };
 }
@@ -689,6 +737,21 @@ const server = http.createServer(async (req, res) => {
       const dateYmd = normaliseDate(url.searchParams.get('date'));
       const limit = Number(url.searchParams.get('limit')) || 60;
       return json(res, 200, await buildStrongest(dateYmd, limit, { refresh: url.searchParams.get('refresh') === '1' }));
+    }
+
+    if (p === '/api/betbuilder') {
+      const dateYmd = normaliseDate(url.searchParams.get('date'));
+      const limit = Number(url.searchParams.get('limit')) || 60;
+      return json(res, 200, await buildBetBuilder(dateYmd, limit, { refresh: url.searchParams.get('refresh') === '1' }));
+    }
+
+    if (p === '/api/betbuilder/record') {
+      await STR.record.settleAll().catch(() => 0);
+      if (url.searchParams.get('format') === 'csv') {
+        res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="bet-builder-record.csv"' });
+        return res.end(STR.record.toCsv('builder'));
+      }
+      return json(res, 200, STR.record.builderSummary());
     }
 
     if (p === '/api/strongest/record') {

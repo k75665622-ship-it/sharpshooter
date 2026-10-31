@@ -133,6 +133,78 @@ settled from ESPN results and the football-data archive. Nothing is edited after
 
 `npm run test:strongest` runs its offline tests (maths, pick rules, reasons, settlement).
 
+## Bet Builder — several selections from one match, 3.0+ odds
+
+The **Bet Builder** tab puts 3–5 selections from **one match** on one slip — say a team to win, both teams to score
+and over 8.5 corners — at **3.0+ fair odds**. Most matches get one (72% of matches in 2023-26, about 22 a match day);
+the day's top builders lead the tab, every match is listed, and **build your own** lets you tick any selections of any
+match and see their combined chance, with warnings when two cannot both happen, when one adds nothing, or when the
+legs pull against each other.
+
+**Why it needs its own maths.** Selections from one match depend on each other: "Arsenal to win" and "Arsenal to
+score" mostly happen together, "under 1.5 goals" and "both teams to score" never do. Multiplying their chances, as
+for an accumulator across matches, is wrong. Every builder is priced by **one model of the whole match**
+([`public/betbuilder-core.js`](public/betbuilder-core.js), the same file on the server and in the page):
+
+| Legs | Model |
+|---|---|
+| Result, goals, both teams to score, team goals | the Dixon-Coles score grid from the bookmakers' expected goals: each selection is a condition on the final score, and the combined chance is the probability of the scores where all of them hold |
+| Corners | each side's corners, negative binomial, from the Strongest Picks' form + price corner model |
+| Cards | the match's cards, negative binomial, from the form + price card model |
+| Scorers (build your own only) | if the team scores n goals, a player with a share s of its goals scores with probability 1 − (1 − s)^n; team-mates by inclusion–exclusion |
+
+Goals, corners and cards are combined as independent; each leg is then nudged to its own **measured** chance (the
+Strongest Picks calibration), and a builder is never given more than its weakest leg.
+
+**How a match's builder is chosen** ([`lib/betbuilder.js`](lib/betbuilder.js)):
+
+1. **Legs**: full-time result, goals, both teams to score, team goals, corners and cards selections with a measured
+   chance of **55%+**, every view at 45%+, and none of the Strongest Picks' trap checks against them (v6 trap, factors
+   below the price, serious team news, team under 1.5 goals kept off for its record). No scorers, halves, minutes or
+   specials in the day's builders.
+2. **One leg per market**; the two likeliest lines of each market are tried.
+3. The combined chance must reach **3.0+ fair odds** and stay under 4.5.
+4. **One story, no padding**: no two legs of a kind may pull against each other (land together less often than if
+   they were unrelated — a hedge that looks safe leg by leg), and every leg must matter — a leg the others already
+   make certain ("Arsenal to score" next to "Arsenal to win") is never used to reach the minimum of three.
+5. Of every combination that qualifies: **the fewest legs** (each leg costs bookmaker margin and is one more thing to
+   go wrong), then **the strongest weakest leg** (corners and cards, with no price of their own, count 3 points lower),
+   then the highest combined chance. The search is exhaustive and checked against brute force in the tests.
+
+**Measured, not promised.** The rule was replayed with the production code on all 76,528 priced matches from July
+2019 (`research/v6/betbuilder_study.js`), every leg settled on the real result:
+
+| Held-out 2023-26 (29,191 matches) | Builders | Landed | Stated |
+|---|---|---|---|
+| **All** (72% of matches, ~22 a match day) | 21,061 | **32.7%** | 32.8% |
+| Goals + corners + cards | 10,124 | 32.9% | 32.7% |
+| Goals + corners | 9,188 | 32.3% | 32.8% |
+| Goals + cards | 1,330 | 33.5% | 32.9% |
+| Corners + cards | 367 | 32.4% | 33.0% |
+| 3 legs / 4 legs | 20,787 / 249 | 32.6% / 35.3% | 32.8% / 32.7% |
+
+2019-23: 26,859 builders, 32.7% landed against 32.8% stated. The stated chance is right, so no extra calibration is
+applied (the code takes one, `builder.cal` in `lib/strongest/models.json`, should the live record ever disagree).
+
+What that means: **a 3.0 builder lands about one time in three** and loses the other two. The only way a builder pays
+over time is a price above its fair odds, and bookmakers usually price bet builders *below* fair, because their margin
+compounds across the legs — so every builder shows its fair odds: take it at that price or better, or leave it.
+
+Limits of the replay, stated: the archive cannot rebuild the v6 factor view or the stats view, so in the replay each
+leg's measured chance rests on the price (and the possession view), the v6 trap checks were off and the two-view rule
+was relaxed to one; and the goal, corner and card calibrations in `models.json` were fitted on every season, so the
+held-out legs are slightly in-sample. Scorers have no history to measure, so they are offered only in build your own,
+marked unmeasured. Every builder is written down before kick-off and settled leg by leg (data/strongest,
+`kind: builder`); nothing is edited afterwards.
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/betbuilder?date=YYYY-MM-DD` | the day's builders, and every match's joint model for build your own |
+| `GET /api/betbuilder/record[?format=csv]` | the bet builders' track record, legs included |
+
+`npm run test:betbuilder` runs its offline tests (the joint model against the score model and the Strongest pricer,
+correlated and contradictory legs, scorers, the search against brute force, the rules).
+
 ---
 
 ## What's new in v6
@@ -671,6 +743,8 @@ the distortion but does not eliminate the extra uncertainty.
 | `GET /api/bankers?date=&limit=`          | Legacy banker election (superseded)           |
 | `GET /api/strongest?date=`               | Strongest Picks: nine SportyBet market groups per match, one pick per match when every view agrees |
 | `GET /api/strongest/record`              | Strongest Picks track record (`?format=csv` to download) |
+| `GET /api/betbuilder?date=`              | Bet Builder: per match, 3-5 selections at 3.0+ fair odds from one joint model of the match, and every match's model for "build your own" |
+| `GET /api/betbuilder/record`             | Bet Builder track record, legs included (`?format=csv` to download) |
 
 ---
 
@@ -707,6 +781,7 @@ sharpshooter/
 │   │                   picks (rules), reasons, record (track record), index (the day)
 │   ├── pace.js         the possession model: shots a game x goals per shot (Strongest Picks, v6 report)
 │   ├── banker.js       the High Banker: seven checks, the 3.0+ slip, the safer 2.0+ slip, bigger slips
+│   ├── betbuilder.js   the Bet Builder: eligible legs, the search for each match's builder, the day
 │   └── engine.js       orchestration + methodology layer + legacy banker
 ├── METHODOLOGY.md      summary of all thirteen methodologies
 ├── methodology/        full v5 playbooks (one per market)
@@ -714,7 +789,8 @@ sharpshooter/
 ├── test/               v5 unit tests, offline end-to-end test, fixtures
 ├── backtest_methodology.js  walk-forward backtest
 ├── test_methodology.js      methodology checks
-├── public/             front-end (vanilla JS, no build step)
+├── public/             front-end (vanilla JS, no build step); betbuilder-core.js is the joint match model
+│                       shared by the server and the Bet Builder tab
 └── data/               disk cache (auto-created)
 ```
 

@@ -14,11 +14,12 @@
   const tierCls = (t) => (t ? String(t).toLowerCase() : 'none');
   const p0 = (v) => (v == null ? '—' : Math.round(v * 100) + '%');
 
-  async function load(force) {
+  /** @param {boolean} force rebuild on the server; @param {boolean} again ask the server again */
+  async function load(force, again) {
     const date = state.date;
-    if (!force && SP.data && SP.date === date) return SP.data;
+    if (!force && !again && SP.data && SP.date === date) return SP.data;
     // this browser's saved copy of the day (public/daycache.js): shown at once
-    if (!force && window.DayCache && (!SP.data || SP.date !== date)) {
+    if (!force && !again && window.DayCache && (!SP.data || SP.date !== date)) {
       const saved = await window.DayCache.getPayload('strongest', date);
       if (saved && state.date === date && (!SP.data || SP.date !== date)) {
         SP.data = saved;
@@ -39,7 +40,13 @@
       if (window.DayCache) window.DayCache.putPayload('strongest', date, merged);
       // the server answered from its day book and is rebuilding: look again shortly
       clearTimeout(SP.poll);
-      if (d.cache && d.cache.refreshing) SP.poll = setTimeout(() => { if (state.view === 'strongest' && state.date === date) window.renderStrongest(); }, 20000);
+      // (it asks the server again: the copy in memory is the stale one)
+      if (d.cache && d.cache.refreshing) {
+        SP.poll = setTimeout(() => {
+          if (state.view !== 'strongest' || state.date !== date) return;
+          load(false, true).then((x) => { if (x && state.view === 'strongest') render(); }).catch(() => {});
+        }, 20000);
+      }
       return merged;
     } catch (err) {
       if (seq === SP.seq) SP.error = err;
