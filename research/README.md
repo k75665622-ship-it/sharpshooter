@@ -29,7 +29,8 @@ curl -L -o Matches.csv https://raw.githubusercontent.com/xgabora/Club-Football-M
 | 8 | `SHARPSHOOTER_CALIBRATION=<tune-only calibration> node research/backtest_methods.js Matches.csv states.json methods.json` | **the production v5 methodology code**, walk-forward, settled on real results |
 | 9 | `node research/ab_v4.js <v4 lib dir> Matches.csv states.json methods_v4.json` | the original v4 code on the same fixtures |
 | 10 | `node research/report_methods.js methods.json` | per-methodology hit rate, stated probability, ROI |
-| 11 | `node research/summarise.js methods.json methods_v4.json` | writes `lib/backtest.json` (shown on the Methodology tab) |
+| 11 | `node research/summarise.js methods.json [methods_v4.json]` | writes `lib/backtest.json` (shown on the Methodology and Tiers tabs; without the v4 file the v4 columns are kept) |
+| 11b | `DIAG=all SHARPSHOOTER_CALIBRATION=<tune-only calibration> node --max-old-space-size=8000 research/backtest_methods.js Matches.csv states.json methods_diag.json` then `node --max-old-space-size=8000 research/methods_audit.js methods_diag.json audit.json` | v5.1 audit: every methodology, the tiers, every hard gate and the checklist bar, tuning v held-out |
 | 12 | `FIT_ALL=1 node research/calibrate_v5.js states.json` then `node research/write_calibration.js states.calib_all.json states.score.json` | production `lib/calibration.json`, refitted on all seasons |
 
 `DIAG=under25,over25,...` on step 8 records every gate and checklist item, which is how the Under 2.5

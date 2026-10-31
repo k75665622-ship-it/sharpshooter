@@ -68,7 +68,7 @@ Every market comes out with **three numbers**:
 
 | Status | Meaning | What you do |
 |---|---|---|
-| 🔒 **LOCK** | All hard gates + ≥ 85% of the checklist pass **and** a real bookmaker price beats the multi-book fair price by ≥ 3%, in the 30–75% band, with ≥ 2 books behind the consensus. | Stake 1 unit if your bookmaker matches the price. |
+| 🔒 **LOCK** | All hard gates + ≥ 70% of the checklist pass (v5.1; draw and final score ≥ 85%) **and** a real bookmaker price beats the multi-book fair price by ≥ 3%, in the 30–75% band, with ≥ 2 books behind the consensus. | Stake 1 unit if your bookmaker matches the price. |
 | 🎯 **PREDICT** | All gates + checklist pass. No book beats the consensus. | Stake **only** if *your* bookmaker (e.g. SportyBet) pays the "take at" price or more. |
 | 📝 **PAPER** | Qualifies, but the market has not earned real money yet (GG/NG 2+). | Record it. Don't stake. |
 | 👀 **WATCH** | Close, but the evidence is thin or the checklist falls just short. | Nothing. |

@@ -547,3 +547,62 @@ mode         exact 13.3% (said 12.7%)  outcome 38.4%  O/U2.5 49.5%  goal-diff 27
 coherent     exact 11.8% (said 10.7%)  outcome 51.0%  O/U2.5 57.2%  goal-diff 24.2%  top-3 contains 34.3%  n=19991
 outcomeMode  exact 11.7% (said 11.1%)  outcome 51.0%  O/U2.5 53.2%  goal-diff 23.9%  top-3 contains 34.3%  n=19991
 ```
+
+## v5.1 — the methodology audit (`methods_audit.js`, October 2026)
+
+`DIAG=all` on `backtest_methods.js` records every hard gate and checklist item of every methodology on every
+candidate (46,075 matches; tune 2019-22, held-out 2023-26). "Edge" = won − stated, in points.
+
+**Each methodology, qualified picks (v5.0 rule), won (stated):**
+
+| | Tuning | Held-out |
+|---|---|---|
+| Over 2.5 | 64.0% (65.0%) · 2,338 | 64.7% (65.5%) · 2,499 |
+| Under 2.5 | 63.8% (63.7%) · 1,854 | 61.7% (64.1%) · 925 |
+| BTTS Yes / No | 61.8% (61.4%) / 58.7% (60.2%) | 63.9% (62.1%) / 57.4% (60.4%) |
+| Team totals | 69.0% (69.4%) · 4,122 | 68.5% (68.9%) · 2,635 |
+| Home / Away win | 74.7% (75.2%) / 75.5% (72.8%) | 77.7% (75.8%) / 74.6% (72.6%) |
+| Draw | 33.5% (32.7%) · 498 | 31.4% (32.2%) · 245 |
+| Underdog + / Favourite − | 72.9% (72.6%) / 68.0% (68.5%) | 75.9% (72.8%) / 70.4% (68.5%) |
+| Double chance | 76.8% (75.9%) · 2,809 | 76.9% (76.0%) · 1,783 |
+| Final score | 12.5% (15.1%) · 806 | 17.6% (15.0%) · 437 |
+
+No methodology is overstated in both periods (Under 2.5 −2.4 held-out, +0.1 tuning; the final score swings −2.6 /
++2.6). At Bet365 prices every one loses a few percent; at the best of ~17 books they are around break-even.
+
+**The checklist bar** — every hard gate passed, by checklist ratio (all methodologies but draw, final score, GG 2+):
+
+| Checklist | Tuning: picks, won (stated), edge | Held-out |
+|---|---|---|
+| 85%+ (qualified in v5.0) | 19,023 · 70.1% (70.0%) · +0.0 ± 0.6 | 13,807 · 70.5% (69.8%) · +0.7 ± 0.8 |
+| 70-85% (WATCH in v5.0) | 10,096 · 70.9% (70.3%) · +0.6 ± 0.9 | 7,758 · 70.8% (70.4%) · +0.4 ± 1.0 |
+| 55-70% | 5,027 · 72.7% (72.0%) · +0.7 ± 1.2 | 4,158 · 73.2% (71.8%) · +1.4 ± 1.4 |
+| under 55% | 2,796 · 71.8% (72.2%) · −0.5 ± 1.6 | 2,690 · 72.7% (72.3%) · +0.4 ± 1.7 |
+
+The checklist ratio does not predict the result beyond the stated probability. The draw is the exception: under
+70% its picks won 3.7 and 2.7 points less than stated (311 and 190 picks), so it keeps the 85% bar; the final score is
+inconclusive (−3.1 tuning, +3.7 held-out at 70-85%) and keeps it too. **v5.1 qualifies at 70%** (the 0.70-0.85 band
+held up in both periods, and 70% still means most of the checks agree). The double-confirmed accumulator keeps 85%,
+the bar its record (`acca_study.js`) was measured with.
+
+**The hard gates** (candidates over the probability floor with the sample; edge of the picks let through v removed):
+most remove few picks and change nothing. The ones that help in both periods: Over 2.5 LOWBLOCK (removed picks
+−4.7 / −4.1), Home Win LEAD (−0.6 / −0.4), Draw GAP (−1.7 / −3.4). Several remove many picks that did as well as the
+ones kept (Team totals DEF, LOW, BIG; the underdog handicap's LOSSES, BLOW, SCORES; Away Win VENUE and LEAD); they are
+kept as the playbooks' structural rules, since removing them would only add picks, not better ones.
+
+**v5.1 replay (70% bar), held-out:** 12,538 fixtures with a methodology pick (v5.0: 9,114), headline 72.1% (stated
+71.5%); every methodology within two points of its stated chance (`lib/backtest.json`, the Methodology tab).
+
+**Tiers by chance** (`lib/methodology/core.js` TIERS), qualified picks, v5.1 rule:
+
+| Tier | Tuning: picks, won (stated) | Held-out |
+|---|---|---|
+| Diamond 80%+ | 1,560 · 84.0% (84.3%) | 1,143 · 85.6% (84.3%) |
+| Gold 70-80% | 14,559 · 75.1% (75.3%) | 10,569 · 76.3% (75.3%) |
+| Silver 60-70% | 9,920 · 65.4% (64.4%) | 7,543 · 65.1% (64.6%) |
+| Bronze 50-60% | 2,312 · 57.7% (57.6%) | 1,860 · 56.6% (57.8%) |
+| Long shot | 2,073 · 30.1% (30.8%) | 1,135 · 30.3% (31.0%) |
+
+The v5.0 tiers (by the 0-100 score) did separate (Gold 80.2%, Silver 71.3%, Bronze 64.2% held-out) because the
+score includes the probability, but its top tier, Platinum, held 43 picks in three seasons.
