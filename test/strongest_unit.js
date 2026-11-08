@@ -174,40 +174,45 @@ const mk = (key, group, views, kind = 'goals', extra = {}) => {
   return { key, group, label: key, kind, side: MAR.sideOf(key), prob: main, raw: main, measured: true, floor: Math.min(...vals), views, nViews: vals.length, ...extra };
 };
 {
-  const s = mk('TTA_U2.5', 'Team', { market: 0.86, stats: 0.8, factors: 0.85 });
-  t('a selection every view rates 80%+ qualifies', PK.blockers(s, ctxOk).length === 0, PK.blockers(s, ctxOk).join(' '));
-  t('one weak view blocks it', PK.blockers(mk('1', 'Match', { market: 0.86, stats: 0.7, factors: 0.85 }), ctxOk).some((w) => /lowest view/.test(w)));
-  t('too short a price blocks it', PK.blockers(mk('O1.5', 'Goals', { market: 0.92, stats: 0.9 }), ctxOk).some((w) => /Pays too little/.test(w)));
-  t('a single view is not enough', PK.blockers(mk('1', 'Match', { market: 0.8 }), ctxOk).some((w) => /Only one view/.test(w)));
+  const s = mk('TTH_O0.5', 'Team', { market: 0.9, stats: 0.8, factors: 0.89 });
+  t(`a selection at ${Math.round(C.minChance * 100)}% that every view rates ${Math.round(C.floor * 100)}%+ qualifies`, PK.blockers(s, ctxOk).length === 0, PK.blockers(s, ctxOk).join(' '));
+  t('one weak view blocks it', PK.blockers(mk('1', 'Match', { market: 0.9, stats: 0.7, factors: 0.89 }), ctxOk).some((w) => /lowest view/.test(w)));
+  t('too short a price blocks it', PK.blockers(mk('O1.5', 'Goals', { market: 0.95, stats: 0.93 }), ctxOk).some((w) => /Pays too little/.test(w)));
+  t('a single view is not enough', PK.blockers(mk('1', 'Match', { market: 0.9 }), ctxOk).some((w) => /Only one view/.test(w)));
   t('no bookmaker price -> goal picks blocked', PK.blockers(s, { ...ctxOk, hasMarket: false }).some((w) => /No bookmaker/.test(w)));
-  t('a v6 trap blocks it', PK.blockers(s, { ...ctxOk, avoid: new Set(['TTA_U2.5']) }).some((w) => /trap/.test(w)));
-  t('factors rating it below the price blocks it', PK.blockers(s, { ...ctxOk, shift: { 'TTA_U2.5': -0.02 } }).some((w) => /below the price/.test(w)));
+  t('a v6 trap blocks it', PK.blockers(s, { ...ctxOk, avoid: new Set(['TTH_O0.5']) }).some((w) => /trap/.test(w)));
+  t('factors rating it below the price blocks it', PK.blockers(s, { ...ctxOk, shift: { 'TTH_O0.5': -0.02 } }).some((w) => /below the price/.test(w)));
   t('kicked off blocks it', PK.blockers(s, { ...ctxOk, started: true }).some((w) => /kicked off/.test(w)));
-  t('serious news on the backed side blocks it', PK.blockers(mk('1', 'Match', { market: 0.86, stats: 0.85 }), { ...ctxOk, news: { home: { highs: 2 }, away: { highs: 0 } } }).some((w) => /team-news/.test(w)));
-  t('serious news on the other side does not', PK.blockers(mk('1', 'Match', { market: 0.86, stats: 0.85 }), { ...ctxOk, news: { home: { highs: 0 }, away: { highs: 2 } } }).length === 0);
-  const c = mk('C_U11.5', 'Corners', { model: 0.8, season: 0.84, recent: 0.83 }, 'corners');
+  t('serious news on the backed side blocks it', PK.blockers(mk('1', 'Match', { market: 0.9, stats: 0.89 }), { ...ctxOk, news: { home: { highs: 2 }, away: { highs: 0 } } }).some((w) => /team-news/.test(w)));
+  t('serious news on the other side does not', PK.blockers(mk('1', 'Match', { market: 0.9, stats: 0.89 }), { ...ctxOk, news: { home: { highs: 0 }, away: { highs: 2 } } }).length === 0);
+  t('a tested league qualifies', PK.blockers(s, { ...ctxOk, league: 'eng.1' }).length === 0);
+  t('a league the rule was never measured on blocks it', PK.blockers(s, { ...ctxOk, league: 'sau.1' }).some((w) => /never measured on this league/.test(w)));
+  const c = mk('CH_O4.5', 'Corners', { model: 0.8, season: 0.84, recent: 0.83 }, 'corners');
   t(`corners need a measured ${Math.round(C.minChanceStatsOnly * 100)}%`, PK.blockers(c, ctxOk).some((w) => /Measured chance 80%/.test(w)), PK.blockers(c, ctxOk).join(' '));
-  t('corners qualify with the measured bar met and every view agreeing', PK.blockers(mk('C_U11.5', 'Corners', { model: 0.87, season: 0.86, recent: 0.85 }, 'corners'), ctxOk).length === 0, PK.blockers(mk('C_U11.5', 'Corners', { model: 0.87, season: 0.86, recent: 0.85 }, 'corners'), ctxOk).join(' '));
-  t('corners blocked with too few archived games', PK.blockers(mk('C_U11.5', 'Corners', { model: 0.84, season: 0.82, recent: 0.81 }, 'corners'), { ...ctxOk, statsGames: { home: 3, away: 20 } }).some((w) => /archived games/.test(w)));
-  t('corners without the price-aware model are never measured', PK.blockers({ ...mk('C_U11.5', 'Corners', { season: 0.86, recent: 0.85 }, 'corners'), measured: false }, ctxOk).some((w) => /No bookmaker price to read the match/.test(w)));
+  t('corners qualify with the measured bar met and every view agreeing', PK.blockers(mk('CH_O4.5', 'Corners', { model: 0.9, season: 0.86, recent: 0.85 }, 'corners'), ctxOk).length === 0, PK.blockers(mk('CH_O4.5', 'Corners', { model: 0.9, season: 0.86, recent: 0.85 }, 'corners'), ctxOk).join(' '));
+  t('corners blocked with too few archived games', PK.blockers(mk('CH_O4.5', 'Corners', { model: 0.9, season: 0.82, recent: 0.81 }, 'corners'), { ...ctxOk, statsGames: { home: 3, away: 20 } }).some((w) => /archived games/.test(w)));
+  t('corners without the price-aware model are never measured', PK.blockers({ ...mk('CH_O4.5', 'Corners', { season: 0.9, recent: 0.89 }, 'corners'), measured: false }, ctxOk).some((w) => /No bookmaker price to read the match/.test(w)));
   t('players never qualify', PK.blockers(mk('PL_H_0', 'Players', { market: 0.8, stats: 0.8 }, 'players'), ctxOk).some((w) => /line-up/.test(w)));
   t('a market with no measured record never qualifies', PK.blockers({ ...mk('M15_N', 'Minutes', { market: 0.82, stats: 0.81 }), measured: false }, ctxOk).some((w) => /no measured record/.test(w)));
-  t('the measured chance must reach the bar even when every view does', PK.blockers({ ...mk('TTA_U2.5', 'Team', { market: 0.83, stats: 0.8, factors: 0.82 }), prob: 0.78 }, ctxOk).some((w) => /Measured chance 78%/.test(w)));
-  t('the bookmakers\' own probability decides "pays too little" for goal markets', PK.blockers({ ...mk('O1.5', 'Goals', { market: 0.9, stats: 0.86 }), prob: 0.86 }, ctxOk).some((w) => /Pays too little/.test(w)));
+  t('the measured chance must reach the bar even when every view does', PK.blockers({ ...mk('TTH_O0.5', 'Team', { market: 0.9, stats: 0.89, factors: 0.9 }), prob: 0.85 }, ctxOk).some((w) => /Measured chance 85%/.test(w)));
+  t('the bookmakers\' own probability decides "pays too little" for goal markets', PK.blockers({ ...mk('O1.5', 'Goals', { market: 0.95, stats: 0.9 }), prob: 0.9 }, ctxOk).some((w) => /Pays too little/.test(w)));
   const keepOff = C.excluded.slice();
-  C.excluded.push('TTA_U2.5');
+  C.excluded.push('TTH_O0.5');
   t('an excluded market is kept off the list', PK.blockers(s, ctxOk).some((w) => /kept off the list/.test(w)));
   C.excluded.length = 0;
   C.excluded.push(...keepOff);
-  t('production: team under 1.5 goals is kept off the list (it ran 1-3 points under its stated chance in both periods)',
-    ['TTH_U1.5', 'TTA_U1.5'].every((k) => PK.blockers(mk(k, 'Team', { market: 0.87, stats: 0.86, factors: 0.88 }), ctxOk).some((w) => /kept off the list/.test(w))));
-  t('production: the exclusion keeps team under 2.5 goals', PK.blockers(mk('TTH_U2.5', 'Team', { market: 0.87, stats: 0.86, factors: 0.88 }), ctxOk).length === 0);
+  t('production: every team under and clean sheet is kept off the list (half the old list, paying 1.10-1.15)',
+    ['TTH_U0.5', 'TTA_U0.5', 'TTH_U1.5', 'TTA_U1.5', 'TTH_U2.5', 'TTA_U2.5'].every((k) => PK.blockers(mk(k, 'Team', { market: 0.9, stats: 0.89, factors: 0.9 }), ctxOk).some((w) => /kept off the list/.test(w))));
+  t('production: BTTS No, away-or-draw & over 1.5 and total corners under are kept off (they won far less than stated)',
+    ['BTTS_N', 'DCX2_O1.5'].every((k) => PK.blockers(mk(k, 'Goals', { market: 0.9, stats: 0.89 }), ctxOk).some((w) => /kept off the list/.test(w)))
+    && PK.blockers(mk('C_U11.5', 'Corners', { model: 0.92, season: 0.9, recent: 0.9 }, 'corners'), ctxOk).some((w) => /kept off the list/.test(w)));
+  t('production: team overs stay on the list', PK.blockers(mk('TTH_O0.5', 'Team', { market: 0.9, stats: 0.89, factors: 0.9 }), ctxOk).length === 0);
 }
 {
   // no fixed number of picks
   const fixtures = Array.from({ length: 9 }, (_, i) => ({
     id: String(i), kickoff: `2026-10-24T1${i}:00:00Z`, ctx: ctxOk,
-    sels: [mk('TTA_U2.5', 'Team', { market: C.minChance + 0.005 + i * 0.004, stats: 0.79, factors: 0.81 }), mk('O2.5', 'Goals', { market: 0.6, stats: 0.6 })],
+    sels: [mk('TTH_O0.5', 'Team', { market: C.minChance + 0.002 + i * 0.004, stats: 0.79, factors: 0.81 }), mk('O2.5', 'Goals', { market: 0.6, stats: 0.6 })],
   }));
   const r = PK.select(fixtures);
   t('nine qualifying matches -> nine picks (no cap at five)', r.picks.length === 9, r.picks.length);
@@ -215,25 +220,36 @@ const mk = (key, group, views, kind = 'goals', extra = {}) => {
   t('ordered by the measured chance', r.picks.every((p, i, a) => i === 0 || a[i - 1].sel.prob >= p.sel.prob));
   t('combined chances for 2, 3, 5 and all', r.combined.map((c) => c.size).join(',') === '2,3,5,9', r.combined.map((c) => c.size).join(','));
   t('combined chance is the product', near(r.combined[0].prob, r.picks[0].sel.prob * r.picks[1].sel.prob));
-  const none = PK.select([{ id: 'a', kickoff: 'x', ctx: ctxOk, sels: [mk('1', 'Match', { market: C.minChance - 0.02, stats: 0.8 })] }]);
+  const sl = Object.fromEntries(r.slips.map((x) => [x.id, x]));
+  const prod = (n) => r.picks.slice(0, n).reduce((a, p) => a * p.sel.prob, 1);
+  t(`the safe slip keeps the combined chance at ${Math.round(C.safeSlipChance * 100)}%+ and stops before it would drop under`,
+    sl.safe && sl.safe.prob >= C.safeSlipChance - 1e-9 && near(sl.safe.prob, prod(sl.safe.size)) && prod(sl.safe.size + 1) < C.safeSlipChance, sl.safe && `${sl.safe.size} ${sl.safe.prob}`);
+  t(`the longer slip keeps it at ${Math.round(C.longSlipChance * 100)}%+ with more legs`, sl.long && sl.long.size > sl.safe.size && sl.long.prob >= C.longSlipChance - 1e-9 && prod(sl.long.size + 1) < C.longSlipChance, sl.long && sl.long.size);
+  t('every pick on one slip is shown with its (small) chance', sl.all && sl.all.size === 9 && near(sl.all.prob, prod(9)) && sl.all.prob < sl.long.prob);
+  t('slips take the strongest picks first', sl.safe.legs.every((l, i) => l.fixture === r.picks[i].fixture));
+  t('no two slips with the same legs', new Set(r.slips.map((x) => x.size)).size === r.slips.length);
+  const two = PK.slips(r.picks.slice(0, 2));
+  t('two picks -> one slip (the double)', two.length === 1 && two[0].size === 2, JSON.stringify(two.map((x) => [x.id, x.size])));
+  t('one pick -> no slip', PK.slips(r.picks.slice(0, 1)).length === 0);
+  const none = PK.select([{ id: 'a', kickoff: 'x', ctx: ctxOk, sels: [mk('1', 'Match', { market: C.minChance - 0.02, stats: 0.86 })] }]);
   t('nothing qualifies -> no picks, and the near miss is reported', none.picks.length === 0 && none.nearMisses.length === 1);
   const far = PK.select([{ id: 'a', kickoff: 'x', ctx: ctxOk, sels: [mk('1', 'Match', { market: 0.7, stats: 0.68 })] }]);
   t('a selection far under the bar is not a near miss', far.picks.length === 0 && far.nearMisses.length === 0);
   t('two qualifying -> two picks', PK.select(fixtures.slice(0, 2)).picks.length === 2);
   const mixed = PK.select([{ id: 'm', kickoff: 'x', ctx: ctxOk, sels: [
-    mk('K_U5.5', 'Bookings', { model: 0.88, season: 0.87, recent: 0.86 }, 'cards'),
-    mk('TTA_U2.5', 'Team', { market: 0.86, stats: 0.84, factors: 0.85 }),
+    mk('K_U5.5', 'Bookings', { model: 0.91, season: 0.87, recent: 0.86 }, 'cards'),
+    mk('TTH_O0.5', 'Team', { market: 0.89, stats: 0.84, factors: 0.85 }),
   ] }]);
-  t('a bookmaker-backed pick ranks ahead of a slightly stronger cards pick', mixed.picks[0].sel.key === 'TTA_U2.5', mixed.picks[0] && mixed.picks[0].sel.key);
+  t('a bookmaker-backed pick ranks ahead of a slightly stronger cards pick', mixed.picks[0].sel.key === 'TTH_O0.5', mixed.picks[0] && mixed.picks[0].sel.key);
   const swap = PK.select([{ id: 'u', kickoff: 'x', ctx: ctxOk, sels: [
-    mk('TTA_U1.5', 'Team', { market: 0.88, stats: 0.87, factors: 0.88 }),
-    mk('TTA_U2.5', 'Team', { market: 0.86, stats: 0.85, factors: 0.86 }),
+    mk('TTA_U1.5', 'Team', { market: 0.92, stats: 0.91, factors: 0.92 }),
+    mk('TTH_O0.5', 'Team', { market: 0.89, stats: 0.85, factors: 0.86 }),
   ] }]);
-  t('an excluded market gives way to the match\'s next qualifying selection', swap.picks.length === 1 && swap.picks[0].sel.key === 'TTA_U2.5', swap.picks[0] && swap.picks[0].sel.key);
-  const cardsOnly = PK.select([{ id: 'c', kickoff: 'x', ctx: ctxOk, sels: [mk('K_U5.5', 'Bookings', { model: 0.87, season: 0.86, recent: 0.85 }, 'cards')] }]);
-  t('a cards pick still qualifies when it is the match\'s only one', cardsOnly.picks.length === 1 && cardsOnly.picks[0].sel.tier === PK.tierOf(0.87));
-  const [T1, T2, T3] = C.tiers;
-  t('tiers by the measured chance', PK.tierOf(T1.min + 0.01) === T1.name && PK.tierOf(T2.min + 0.005) === T2.name && PK.tierOf(T3.min + 0.005) === T3.name && PK.tierOf(T3.min - 0.05) === null);
+  t('an excluded market gives way to the match\'s next qualifying selection', swap.picks.length === 1 && swap.picks[0].sel.key === 'TTH_O0.5', swap.picks[0] && swap.picks[0].sel.key);
+  const cardsOnly = PK.select([{ id: 'c', kickoff: 'x', ctx: ctxOk, sels: [mk('K_U5.5', 'Bookings', { model: 0.9, season: 0.86, recent: 0.85 }, 'cards')] }]);
+  t('a cards pick still qualifies when it is the match\'s only one', cardsOnly.picks.length === 1 && cardsOnly.picks[0].sel.tier === PK.tierOf(0.9));
+  const [T1, T2] = C.tiers;
+  t('tiers by the measured chance', PK.tierOf(T1.min + 0.01) === T1.name && PK.tierOf(T2.min + 0.005) === T2.name && PK.tierOf(T2.min - 0.05) === null);
   t('every pick on the list is at least the lowest list tier', C.tiers.some((t) => t.min <= C.minChance + 1e-9 && PK.tierOf(C.minChance) === t.name));
 }
 {
@@ -241,6 +257,7 @@ const mk = (key, group, views, kind = 'goals', extra = {}) => {
   t('match card has all nine groups in SportyBet order', cards.map((c) => c.group).join(',') === MAR.GROUPS.join(','));
   t('groups without data say why', cards.find((c) => c.group === 'Corners').none && /statistics/.test(cards.find((c) => c.group === 'Corners').note));
   t('card picks stay inside the probability band', cards.filter((c) => !c.none).every((c) => c.prob >= C.cardMinProb && PK.payProb(c) <= C.maxProb));
+  t('match cards never show a market kept off for its record (team unders, BTTS No...)', cards.filter((c) => !c.none).every((c) => !C.excluded.includes(c.key)), cards.map((c) => c.key).join(','));
 }
 
 // ------------------------------------------------------------------ 7. reasons

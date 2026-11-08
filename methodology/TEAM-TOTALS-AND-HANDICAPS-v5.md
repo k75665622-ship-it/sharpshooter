@@ -20,7 +20,13 @@ the biggest accuracy gain in v5 (+5.5 points).
 
 ## 🎯 TEAM TOTAL GOALS
 
-Each side gets three candidate selections, each with its own floor:
+> **v5.2 (v6.2): team unders are retired.** Only **Over 1.5** is a candidate now. On the v5.1 replay, team under 1.5
+> won 1.0 points under its stated chance on 2023-26 (2,013 picks) and "fails to score" 2.6 under (688); across the
+> site the team unders were the selections that paid least (1.10-1.15) and lost most slips. Held-out with over 1.5
+> only: **69.2% won (said 68.4%) · 1,887**. The under rules below are kept for reference (`TEAM_KINDS_RETIRED`).
+> See `research/v6/RESULTS.md` §9.
+
+Each side used to get three candidate selections, each with its own floor:
 
 | Selection | Floor | The idea |
 |---|---|---|

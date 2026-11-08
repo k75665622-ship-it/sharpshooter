@@ -232,7 +232,10 @@ console.log('\n7. ensemble, calibration and pricing');
 console.log('\n8. final score and general prediction');
 {
   const sp = SL.predict(1.9, 0.7, { home: 0.66, draw: 0.2, away: 0.14, over25: 0.55 });
-  t('coherent score agrees with the result call and the goals call', sp.predicted.home > sp.predicted.away && sp.predicted.home + sp.predicted.away >= 3, sp.predicted.score);
+  t('coherent score agrees with the result call and the goals call', sp.coherent.home > sp.coherent.away && sp.coherent.home + sp.coherent.away >= 3, sp.coherent.score);
+  t('v6.2: the headline predicted score is the single likeliest score', sp.predicted.score === sp.mostLikely.score && sp.predicted.prob >= sp.coherent.prob, `${sp.predicted.score} ${sp.mostLikely.score}`);
+  t('the three likeliest scores and their combined chance', sp.top3.scores.length === 3 && sp.top3.scores[0] === sp.mostLikely.score && Math.abs(sp.top3.prob - sp.top.slice(0, 3).reduce((a, x) => a + x.prob, 0)) < 1e-9);
+  t('the likeliest pair of total-goals counts is two neighbours and beats any other pair', sp.goalsRange.totals[1] === sp.goalsRange.totals[0] + 1 && sp.goalsRange.prob > 0.35 && sp.goalsRange.prob < 0.7, JSON.stringify(sp.goalsRange));
   t('most likely score is the grid argmax', sp.top[0].score === sp.mostLikely.score);
   t('score band covers at least half the probability', sp.band.prob >= 0.5);
   const ens = ENS.combine({ market: { lamH: 1.9, lamA: 0.75, books: 2 }, ratings: null, xg: null, eloDiff: null });

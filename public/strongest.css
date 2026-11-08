@@ -70,16 +70,36 @@
 .sp-price b { font-family: var(--mono); color: var(--text-2); }
 .sp-price em { font-style: normal; font-family: var(--mono); }
 
-/* ---- combined chances ---- */
-.sp-combo {
-  display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; margin: 12px 0 4px; padding: 12px 14px;
-  border: 1px dashed var(--border-strong); border-radius: var(--radius); background: var(--surface-2); font-size: 12.5px;
+/* ---- slips from the day's picks ---- */
+.sp-slips { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+.sp-slip { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; box-shadow: var(--shadow-sm); min-width: 0; }
+.sp-slip.s-safe { border-color: #b9e3cb; box-shadow: 0 0 0 2px var(--green-soft), var(--shadow-sm); }
+.sp-slip.s-all { border-style: dashed; background: var(--surface-2); box-shadow: none; }
+.sp-slip-h { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 4px 14px; align-items: center; }
+.sp-slip-t { font-size: 15px; font-weight: 800; }
+.sp-slip.s-safe .sp-slip-t { color: var(--green); }
+.sp-slip-sub { font-size: 11.5px; color: var(--text-3); margin-top: 4px; }
+.sp-slip-f { text-align: right; }
+.sp-slip-f span { display: block; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+.sp-slip-f b { font-family: var(--mono); font-size: 20px; font-variant-numeric: tabular-nums; }
+.sp-slip.s-safe .sp-slip-f b { color: var(--green); }
+.sp-slip-legs { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.sp-slip-legs li { display: grid; grid-template-columns: 44px minmax(0, 1fr) 40px; gap: 8px; font-size: 12.5px; font-variant-numeric: tabular-nums; align-items: baseline; }
+.sp-slip-legs li > span:first-child { color: var(--text-3); font-size: 11.5px; }
+.sp-slip-legs li > span:last-child { text-align: right; font-family: var(--mono); color: var(--text-2); }
+.sp-slip-legs small { color: var(--text-3); }
+.sp-slip-m { margin-top: 8px; font-size: 11.5px; color: var(--text-3); line-height: 1.5; }
+.sp-slip-m b { color: var(--text); }
+.sp-bysize { margin-top: 10px; }
+.sp-pub { margin: 0 0 12px; }
+.sp-slip-f b.sp-slip-st { font-family: var(--sans); font-size: 15px; }
+.sp-slip-st em { font-style: normal; }
+.s-published .sp-slip-legs li { grid-template-columns: 44px minmax(0, 1fr) 56px; }
+.s-published .sp-slip-legs li > span:last-child { white-space: nowrap; font-family: var(--sans); }
+.sp-bysize .bt-table { margin-top: 8px; }
+@media (max-width: 420px) {
+  .sp-slips { grid-template-columns: minmax(0, 1fr); }
 }
-.sp-combo-k { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
-.sp-combo-i { font-variant-numeric: tabular-nums; }
-.sp-combo-i b { color: var(--text); }
-.sp-combo-i small { color: var(--text-3); font-family: var(--mono); }
-.sp-combo-n { flex-basis: 100%; color: var(--text-3); font-size: 11.5px; }
 
 /* ---- secondary lists ---- */
 .sp-sec { margin-top: 24px; }

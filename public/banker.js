@@ -128,6 +128,51 @@
       }).join('')}</div>`;
   }
 
+  /**
+   * The safest slip of the day, from the Strongest Picks (public/strongest.js loads them): the
+   * strongest picks while the combined chance stays at 75%+. Loaded once per date; the tab is
+   * drawn again when it arrives.
+   */
+  const SAFE = { date: null, data: null, loading: false };
+  function safeData() {
+    if (SAFE.date === state.date) return SAFE.data;
+    if (!SAFE.loading && typeof window.strongestDay === 'function') {
+      SAFE.loading = true;
+      const date = state.date;
+      window.strongestDay().then((d) => {
+        SAFE.loading = false;
+        if (state.date !== date) return;
+        SAFE.date = date;
+        SAFE.data = d || null;
+        if (state.view === 'banker') window.renderBanker();
+      }).catch(() => {
+        SAFE.loading = false;
+        SAFE.date = date;
+        SAFE.data = null;
+      });
+    }
+    return null;
+  }
+
+  function safeBlock() {
+    const sp = safeData();
+    if (!sp) {
+      return `<div class="sec-title bk-sec">Safest slip today <span class="pill">Strongest Picks</span></div>
+        <p class="muted-t bk-near-p">${SAFE.loading ? 'Loading the Strongest Picks…' : 'Open the Strongest Picks tab to build today\'s safest slip.'}</p>`;
+    }
+    const sl = (sp.slips || []).find((x) => x.id === 'safe');
+    const pub = typeof window.strongestPublishedCard === 'function' ? window.strongestPublishedCard(sp.publishedSlip) : '';
+    const m = sp.config && sp.config.measured && sp.config.measured.slips && sp.config.measured.slips.safe;
+    const lead = `The strongest picks of the day (each ${pct((sp.config && sp.config.minChance) || 0.88, 0)}+ measured chance) while the combined chance stays at
+      ${pct((sp.config && sp.config.safeSlipChance) || 0.75, 0)}+. Short odds — about ${dec(m && m.fairOdds ? m.fairOdds : 1.28)} — but it is the slip that lands most often${m && m.n
+      ? `: <b>${pct(m.landed, 1)}</b> of ${m.n.toLocaleString()} match days on the 2023–26 seasons the rule never saw` : ''}.`;
+    return `<div class="sec-title bk-sec">Safest slip today <span class="pill">from the Strongest Picks</span></div>
+      <p class="muted-t bk-near-p">${lead}</p>
+      ${pub ? `<div class="sp-slips sp-pub">${pub}</div>` : ''}
+      ${sl && typeof window.strongestSlipCard === 'function' ? `<div class="sp-slips">${window.strongestSlipCard(sl)}</div>`
+        : pub ? '' : `<div class="empty bk-empty"><p>${(sp.picks || []).length === 1 ? 'Only one Strongest Pick today: play it as a single.' : 'Not enough Strongest Picks today for a safe slip. No slip is safer than a padded one.'}</p></div>`}`;
+  }
+
   window.renderBanker = function () {
     const el = $('#board');
     const d = state.preds;
@@ -141,9 +186,17 @@
     const bankers = b.bankers || [];
     const slipIds = new Set(((b.slip && b.slip.legs) || []).map((l) => String(l.fixtureId)));
     const extra = bankers.filter((l) => !slipIds.has(String(l.fixtureId))).sort((x, y) => y.prob - x.prob);
+    const h = b.record && b.record.heldOut;
+    const oneIn = h && h.slip && h.slip.hit > 0 ? Math.round(1 / h.slip.hit) : 3;
     el.innerHTML = `<div class="m-intro bk-intro">
         <div class="bk-kicker">High Banker · ${esc(fmtDateLong(d.date || state.date))}</div>
-        <h2>The day's bankers — ${dec(target, 1)}+ odds, nothing padded</h2>
+        <h2>Today's bankers — start with the safest slip</h2>
+        <div class="meas-note"><b>Read this first.</b> Odds tell the truth about the chance: a ${dec(target, 1)}-odds slip cannot land more than about
+        1 time in ${Math.round(target)}, however strong its legs. On the seasons the rule never saw, the ${dec(target, 1)}+ High Banker landed
+        ${h && h.slip ? `<b>${pct(h.slip.hit, 1)}</b>` : 'about a third'} of the time — roughly 1 day in ${oneIn} — and the safer ${dec(cfg.safer || 2, 1)}+ slip
+        ${h && h.safer ? `<b>${pct(h.safer.hit, 1)}</b>` : 'about half'}. If you want to win most days, play the <b>safest slip</b> below: short odds, but it lands far more often.</div>
+        ${safeBlock()}
+        <div class="sec-title bk-sec">The ${dec(target, 1)}+ High Banker</div>
         <p>Only selections that pass <b>every one of seven checks</b> are bankers: the model and the bookmakers' own price both rate it at least
         ${pct(cfg.minProb || 0.78, 0)}/${pct(cfg.minBase || 0.75, 0)}, the factors do not flag it as a bookmaker trap, it agrees with the normal prediction,
         neither team's record raises a red flag, it still pays, and nothing changed before kick-off. The slip is the <b>most likely set of bankers</b> that
@@ -154,7 +207,7 @@
       </div>
       ${b.error ? `<div class="err-box">${esc(b.error)}</div>` : ''}
       ${b.frozen ? '<div class="meas-note">This slip was published before its first kick-off and is kept unchanged; legs are ticked or crossed as results come in.</div>' : ''}
-      ${b.slip ? slipCard(b.slip, 'High Banker', `${b.slip.size} banker${b.slip.size === 1 ? '' : 's'} · the most likely way to ${dec(target, 1)}+ odds today`)
+      ${b.slip ? slipCard(b.slip, 'High Banker', `${b.slip.size} banker${b.slip.size === 1 ? '' : 's'} · the most likely way to ${dec(target, 1)}+ odds today · lands about 1 day in ${oneIn}`)
         : `<div class="empty bk-empty"><h3>No ${dec(target, 1)}+ High Banker today</h3><p>${bankers.length
           ? `Today's ${bankers.length} banker${bankers.length === 1 ? '' : 's'} reach${bankers.length === 1 ? 'es' : ''} only ${dec(b.all ? b.all.odds : 1)} odds together. Weaker picks are never added to make up the odds — that is the point of a banker. They are listed below.`
           : 'No selection passes every check today. That is the filter doing its job: on days like this the safest bet is no bet.'}</p></div>`}

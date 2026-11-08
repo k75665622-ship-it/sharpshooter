@@ -22,7 +22,12 @@ See [`methodology/GENERAL-PREDICTION-v6.md`](methodology/GENERAL-PREDICTION-v6.m
 
 ## High Banker — the day's safest picks, 3.0+ odds
 
-The **High Banker** tab takes only selections that pass **every one of seven checks**, then builds the
+**Start with the safest slip (v6.2).** The tab now opens with the day's **safe slip from the Strongest Picks**: the
+strongest picks while the combined chance stays at 75%+ (about 2.7 legs, fair odds about 1.28). On the 2023-26
+seasons the rule never saw it landed **80.4%** of 613 match days. It says in plain words what the record below shows:
+a 3.0-odds slip lands about **1 day in 3** however strong its legs, and the 2.0+ slip about **1 day in 2**.
+
+The **High Banker** itself takes only selections that pass **every one of seven checks**, then builds the
 **most likely slip that reaches 3.0 odds** from them. There is no fixed number of legs and no upper limit:
 the tab also shows the most likely slips at **5+, 10+ and 20+** when the day's bankers reach them, and lists
 every banker. When the bankers cannot reach 3.0 there is **no slip** — weaker picks are never added to make up
@@ -98,37 +103,47 @@ it actually won on past matches, given what each view said — a per-market cali
 it learned: the v6 factors' disagreement with the price is real but worth about 40% of its size, and a form-only
 view that disagrees with the bookmakers is on the **wrong** side of them in every market measured.
 
-**A pick qualifies when:** its measured chance is at least **84%** (**86%** for corners and bookings, which have no
-bookmaker price of their own and are only priced when the bookmakers' read of the match exists); every view rates it at
-least **75%**; the bookmakers' own probability is at most **88%** (it still pays 1.14+); the v6 layer does not flag it
-as a trap or overrated by the price; no serious team news hits the side it backs; and the market has a measured record
-(minute markets and scorers do not, so they stay on the match cards only). **Team under 1.5 goals** is kept off the
-list too: at this level it won 1-3 points less than stated in both research periods, worst against a heavy favourite
-(it stays on the match cards). Strength is the measured chance: **Elite** 87%+, **Strong** 84%+. Every number lives in
-[`lib/strongest/config.js`](lib/strongest/config.js).
+**A pick qualifies when (v3.0, v6.2):** its measured chance is at least **88%** (**89%** for corners and bookings,
+which have no bookmaker price of their own and are only priced when the bookmakers' read of the match exists); every
+view rates it at least **75%**; the bookmakers' own probability is at most **93%** (it still pays 1.08+); the v6 layer
+does not flag it as a trap or overrated by the price; no serious team news hits the side it backs; the market has a
+measured record (minute markets and scorers do not); and the match is in one of the **18 leagues the rule was measured
+on** (England 1-4, Scotland, Germany 1-2, Italy 1-2, Spain 1-2, France 1-2, Netherlands, Belgium, Portugal, Turkey,
+Greece). **Team unders and clean sheets, "both teams to score: No", away-or-draw & over 1.5 and total corners under
+are kept off the list, the match cards and the bet builders**: they paid 1.10-1.15 and filled half the old list, or
+won clearly less than stated in both research periods. Strength is the measured chance: **Elite** 90%+, **Strong**
+88%+. Every number lives in [`lib/strongest/config.js`](lib/strongest/config.js).
 
-**Measured, not promised.** The rule was replayed with the production code on all 76,528 priced matches from July
-2019 (`research/v6/strongest_study.js`), models and bars chosen on 2019-23 and the 2023-26 seasons measured once:
+**Slips.** Picks are from different matches, so on one slip their chances multiply: ten 88% picks land together only
+28% of the time. The tab builds the day's **safe slip** (the strongest picks while the combined chance stays at 75%+),
+a **longer slip** (60%+) and, for comparison, every pick on one slip — each with how slips built that way did on past
+matches, and a table of how often a slip of N picks landed.
 
-| Held-out 2023-26 (29,191 matches) | Old rule (v1) | **New rule (v2)** |
+**Measured, not promised.** The rule was replayed on all 76,528 priced matches from July 2019
+(`research/v6/slips_study.js` + `slips_report.js`; [research/v6/RESULTS.md §9](research/v6/RESULTS.md)), the bars
+chosen on 2019-23 and the 2023-26 seasons reported apart:
+
+| Held-out 2023-26 (29,191 matches) | Old rule (v2, 84%) | **New rule (v3, 88%)** |
 |---|---|---|
-| Strongest Picks | 28,361 — 97% of matches, ~31 a match day | **18,309 — 63% of matches, ~19 a match day** |
-| Won (stated) | 84.1% (84.5%) | **86.4% (86.7%)** |
-| Corners | 79.3% (85.5%) — form alone overrated them | **86.9% (87.0%)** |
-| Bookings | 82.4% (85.6%) | **86.7% (87.0%)** |
-| Elite / Strong | — | 87.6% (88.0%) / 85.5% (85.6%) |
+| Strongest Picks a match day | ~21 (54% of them team unders) | **~8** |
+| Won (stated) | 86.5% (86.5%) | **90.6% (90.6%)** |
+| Elite / Strong | 87.6% / 85.5% | **91.6% / 89.0%** |
+| Safe slip (75%+ combined) | — | **80.4% landed, 2.7 legs, fair odds 1.28** (613 days) |
+| A slip of 5 / 10 picks | 51.7% / 25.1% | 65.6% / 40.0% |
 
-Even at 86%, about one pick in seven loses: a strong pick is not a certain one, and the page says so.
+Even at 90%, about one pick in ten loses, and the longer the slip the likelier one of its legs does.
 
 Each pick comes with the facts behind it (its measured record, prices, expected goals from every view, the possession
 model's shots and finishing, last-10 form at its own line, head-to-head, table, referee, players, team news) and its
-caveats. The tab also shows every match's nine-market card, near misses, the chance of combining the top picks, the
-measured record above, and a **live track record**: every pick is written down before kick-off (data/strongest) and
-settled from ESPN results and the football-data archive. Nothing is edited afterwards.
+caveats. The tab also shows every match's nine-market card, near misses, the day's slips, the measured record above,
+and a **live track record**: every pick and the day's safe slip are written down before kick-off (data/strongest) and
+settled from ESPN results and the football-data archive. Nothing is edited afterwards. Each entry carries the rule
+version it was chosen under, and the page shows the current rule's record apart from older ones. To keep the record
+when the host's disk is wiped, see [Keeping the track record](#keeping-the-track-record-render-free-tier).
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /api/strongest?date=YYYY-MM-DD` | the day's Strongest Picks, near misses, combined chances and every match's nine-market card |
+| `GET /api/strongest?date=YYYY-MM-DD` | the day's Strongest Picks, their slips, near misses and every match's nine-market card |
 | `GET /api/strongest/record[?format=csv]` | the Strongest Picks track record |
 
 `npm run test:strongest` runs its offline tests (maths, pick rules, reasons, settlement).
@@ -245,6 +260,38 @@ Diamond pick loses about one time in seven. (Until v5.1 the tier came from the 0
 still waiting).
 
 ---
+
+## What's new in v6.2 — fewer, stronger picks and honest slips
+
+- **Strongest Picks v3.0**: 88% measured chance (was 84%), about 8 picks a match day instead of 21; on the held-out
+  2023-26 seasons they won **90.6%** (stated 90.6%). Team unders, clean sheets, BTTS No, away-or-draw & over 1.5 and
+  total corners under are off the list, the match cards and the bet builders. Only the 18 leagues the rule was
+  measured on.
+- **Safe slips**: the day's safe slip (75%+ combined, landed 80.4% held-out), a longer slip (60%+, 67.9%) and every
+  pick on one slip, each with its measured landing rate. The High Banker tab leads with the safe slip.
+- **Final score**: the headline is now the single likeliest score (exactly right 13.3% held-out, against 11.7% for the
+  old headline), shown with the three likeliest scores (one of them 34.1%) and the likeliest goals range ("2 or 3
+  goals", 46.8%).
+- **Methodologies v5.2**: Team Total Goals no longer offers team unders.
+- **A record that survives restarts** (opt-in, below), split by rule version, with the safe slips settled too.
+
+Why: the single picks always won about what they said; slips of many ~86% picks did not (ten land together about a
+quarter of the time). Details in [research/v6/RESULTS.md §9](research/v6/RESULTS.md).
+
+## Keeping the track record (Render free tier)
+
+Render's free disk is wiped on every deploy, restart and wake-up, so the live record started again each time. Set
+two environment variables and the Strongest Picks, safe slips, bet builders and High Banker records are mirrored to
+a `records` branch of a GitHub repository and restored on start ([`lib/persist.js`](lib/persist.js)):
+
+1. On GitHub: **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**.
+   Repository access: **only** the repository the records go to. Permissions: **Contents: Read and write**. Nothing else.
+2. On Render: your service → **Environment** → add `SHARPSHOOTER_RECORDS_REPO` = `owner/repo` and
+   `SHARPSHOOTER_RECORDS_TOKEN` = the token. Optionally `SHARPSHOOTER_RECORDS_BRANCH` (default `records`).
+
+The branch is created from the default branch if missing; Render deploys from your main branch, so record writes
+never trigger a redeploy. Records are pushed at most every two minutes and on shutdown. `GET /api/health` shows the
+mirror's status (never the token).
 
 ## What's new in v6
 
@@ -810,6 +857,7 @@ sharpshooter/
 │   ├── scoreline.js    predicted / most likely / half-time score
 │   ├── general.js      general prediction for every fixture
 │   ├── ledger.js       pre-match record + settlement (picks, value picks, accumulators)
+│   ├── persist.js      opt-in mirror of the track records to a GitHub branch (survives a wiped disk)
 │   ├── crawler/        v6 polite crawler: http.js (robots, rate limits, conditional GET, cache),
 │   │                   sources/ (football-data, ClubElo momentum, Open-Meteo), warehouse.js
 │   ├── factors/        v6 factor engine: records, history store, 170 factors, tree-model evaluator, models/

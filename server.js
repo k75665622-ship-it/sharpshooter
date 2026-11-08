@@ -56,6 +56,7 @@ const BL = require('./lib/betbuilder');
 const DAYBOOK = require('./lib/daybook');
 const BANKER = require('./lib/banker');
 const SS = require('./public/shared.js');
+const PERSIST = require('./lib/persist');
 
 const readJson = (f) => {
   try {
@@ -585,7 +586,9 @@ async function buildStrongest(dateYmd, limit, opts = {}) {
   return {
     ...day,
     config: STR.publicConfig(),
-    record: STR.record.summary(),
+    record: { ...STR.record.summary(), persist: PERSIST.status() },
+    // the day's safe slip as first published, so the slip that was played stays on the page
+    publishedSlip: STR.record.slipFor(isoFromYmd(dateYmd)),
     earlier: STR.record.forDate(isoFromYmd(dateYmd)).filter((e) => Date.parse(e.date) <= now).map((e) => ({
       fixture: e.fixture, date: e.date, league: e.leagueName || e.league, home: e.home, away: e.away, group: e.group, label: e.label,
       prob: e.prob, floor: e.floor, tier: e.tier, result: e.result, hit: e.hit, ht: e.ht || null,
@@ -665,6 +668,7 @@ const server = http.createServer(async (req, res) => {
         leaguesConfigured: L.all().length,
         coreLeagues: L.CORE_SLUGS.length,
         analysisCached: analysisCache.size,
+        records: PERSIST.status(),
         sources: [
           'site.api.espn.com/apis/site/v2/sports/soccer/{league}/scoreboard',
           'site.api.espn.com/apis/site/v2/sports/soccer/{league}/summary',
@@ -827,7 +831,7 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="strongest-picks-record.csv"' });
         return res.end(STR.record.toCsv());
       }
-      return json(res, 200, STR.record.summary());
+      return json(res, 200, { ...STR.record.summary(), persist: PERSIST.status() });
     }
 
     if (p === '/api/bankers') {
@@ -854,6 +858,23 @@ const dayTimer = setInterval(() => {
   freshPredictions(today, 60).then(() => freshStrongest(today, 60)).catch(() => null);
 }, 10 * 60 * 1000);
 if (dayTimer.unref) dayTimer.unref();
+
+// The track records survive a wiped disk when SHARPSHOOTER_RECORDS_REPO / _TOKEN are set
+// (lib/persist.js): restored on start, pushed every two minutes and on shutdown.
+PERSIST.restore().then((r) => {
+  if (r.enabled) console.log(r.error ? `  Records     mirror error: ${r.error}` : `  Records     restored ${r.entries} entries from ${r.files} mirrored files`);
+}).catch(() => null);
+let stopping = false;
+for (const sig of ['SIGTERM', 'SIGINT']) {
+  process.once(sig, () => {
+    if (stopping) return;
+    stopping = true;
+    const done = () => process.exit(0);
+    const t = setTimeout(done, 8000);
+    if (t.unref) t.unref();
+    PERSIST.flush().catch(() => 0).finally(done);
+  });
+}
 
 server.listen(PORT, HOST, () => {
   const url = `http://${HOST}:${PORT}`;
