@@ -114,6 +114,9 @@ for (const div of Object.keys(byDiv)) {
       res: g.result.call, resHit: (g.result.call === 'H' && fx.hg > fx.ag) || (g.result.call === 'A' && fx.hg < fx.ag) || (g.result.call === 'D' && fx.hg === fx.ag) ? 1 : 0, resProb: g.result.prob,
       score: g.score.predicted.score, scoreHit: g.score.predicted.score === `${fx.hg}-${fx.ag}` ? 1 : 0, scoreProb: g.score.predicted.prob,
       mode: g.score.mostLikely.score, modeHit: g.score.mostLikely.score === `${fx.hg}-${fx.ag}` ? 1 : 0,
+      cohHit: g.score.coherent && g.score.coherent.score === `${fx.hg}-${fx.ag}` ? 1 : 0,
+      top3Hit: g.score.top3 && g.score.top3.scores.includes(`${fx.hg}-${fx.ag}`) ? 1 : 0, top3Prob: g.score.top3 ? g.score.top3.prob : null,
+      goalsHit: g.score.goalsRange && g.score.goalsRange.totals.includes(fx.hg + fx.ag) ? 1 : 0, goalsProb: g.score.goalsRange ? g.score.goalsRange.prob : null,
       conf: g.confidence.level,
     });
     done++;

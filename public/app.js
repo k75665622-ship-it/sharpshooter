@@ -391,9 +391,11 @@ function generalSection(rep) {
       <div class="gp-score">
         <div class="gp-k">Predicted final score</div>
         <div class="gp-sc">${esc(m.home.short || m.home.name)} <b>${sp.predicted.home} – ${sp.predicted.away}</b> ${esc(m.away.short || m.away.name)}</div>
-        <div class="gp-sub">${pct(sp.predicted.prob, 1)} exact · half-time ${esc(sp.halfTime.score)} · xG ${dec(sp.expected.home)}–${dec(sp.expected.away)}</div>
-        ${sp.mostLikely.score !== sp.predicted.score ? `<div class="gp-sub">Single likeliest score: <b>${esc(sp.mostLikely.score)}</b> (${pct(sp.mostLikely.prob, 1)})</div>` : ''}
+        <div class="gp-sub">${pct(sp.predicted.prob, 1)} exact — the single likeliest score · half-time ${esc(sp.halfTime.score)} · xG ${dec(sp.expected.home)}–${dec(sp.expected.away)}</div>
+        ${sp.top3 ? `<div class="gp-sub">Likeliest three: <b>${esc(sp.top3.scores.join(', '))}</b> — one of them ${pct(sp.top3.prob, 0)}</div>` : ''}
+        ${sp.goalsRange ? `<div class="gp-sub">Total goals: <b>${esc(sp.goalsRange.label)}</b> ${pct(sp.goalsRange.prob, 0)}</div>` : ''}
         <div class="gp-sub">Score band (${pct(sp.band.prob, 0)}): ${esc(sp.band.scores.join(', '))}</div>
+        <div class="gp-sub muted-t">One exact score is right about 1 time in 8 even for the best models; the three likeliest cover about 1 in 3.</div>
       </div>
       <div class="gp-calls">
         <div class="gp-call"><span>Result</span><b>${esc(g.result.label)}</b><em>${pct(g.result.prob, 0)}</em></div>
@@ -1197,7 +1199,7 @@ async function renderMethod() {
       <div><div class="v">${pct(bt.headline.v5.hitRate, 1)}</div><div class="k">Top pick per fixture hit rate (v5)<br>said ${pct(bt.headline.v5.statedProb, 1)} · ${bt.headline.v5.n.toLocaleString()} picks</div></div>
       <div><div class="v muted">${pct(bt.headline.v4.hitRate, 1)}</div><div class="k">Same test, v4 code<br>said ${pct(bt.headline.v4.statedProb, 1)} · ${bt.headline.v4.n.toLocaleString()} picks</div></div>
       <div><div class="v">${pct(bt.general.bestBet.hitRate, 1)}</div><div class="k">General best bet, every fixture<br>said ${pct(bt.general.bestBet.statedProb, 1)}</div></div>
-      <div><div class="v">${pct(bt.general.predictedScore.exact, 1)}</div><div class="k">Predicted score exactly right<br>(single likeliest score ${pct(bt.general.mostLikelyScore.exact, 1)})</div></div>
+      <div><div class="v">${pct(bt.general.predictedScore.exact, 1)}</div><div class="k">Predicted score exactly right<br>${bt.general.top3Scores ? `one of the three likeliest ${pct(bt.general.top3Scores.hit, 1)}` : `single likeliest score ${pct(bt.general.mostLikelyScore.exact, 1)}`}</div></div>
     </div>
     <div class="bt-note">${esc(bt.dataset || '')}. Held-out seasons were never used to fit a v5 parameter. "Said" is the average stated probability: when hit ≈ said, the percentages on this site can be taken at face value.</div>` : ''}
     <div class="sec-title">The methodologies <span class="pill">${d.methods.length}</span></div>

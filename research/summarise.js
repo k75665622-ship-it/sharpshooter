@@ -58,13 +58,20 @@ const out = {
   dataset: 'Club Football Match Data 2000-2025 (football-data.co.uk results + Bet365 / best-of-17 odds + ClubElo), 18 European divisions',
   heldOut: 'seasons 2023-24 to 2026-27 (not used to fit any v5 parameter)',
   fixtures: G.length,
-  rule: `v${CORE.CFG.qualify === 0.7 ? '5.1' : '5.0'}: every hard gate, then ${Math.round(CORE.CFG.qualify * 100)}% of the checklist (draw and correct score 85%)`,
+  rule: `v${CORE.CFG.qualify === 0.7 ? '5.2' : '5.0'}: every hard gate, then ${Math.round(CORE.CFG.qualify * 100)}% of the checklist (draw and correct score 85%); no team-under candidates`,
   headline: { v5: agg(v5.rows.filter((r) => HOLD(r) && r.headline)), v4: v4 ? agg(v4.rows.filter((r) => HOLD(r) && r.headline)) : (prev.headline && prev.headline.v4) || null },
   general: {
     bestBet: agg(G.filter((g) => g.key).map((g) => ({ ...g, prob: g.prob }))),
     resultCall: { hitRate: mean('resHit'), statedProb: mean('resProb') },
     predictedScore: { exact: mean('scoreHit'), statedProb: mean('scoreProb') },
     mostLikelyScore: { exact: mean('modeHit') },
+    // v6.2: the headline score is the single likeliest; the coherent one (inside the result and
+    // goals calls) is the Correct Score methodology's
+    ...(G[0] && G[0].top3Hit != null ? {
+      coherentScore: { exact: mean('cohHit') },
+      top3Scores: { hit: mean('top3Hit'), statedProb: mean('top3Prob') },
+      goalsRange: { hit: mean('goalsHit'), statedProb: mean('goalsProb') },
+    } : {}),
   },
   methods,
   tiers,

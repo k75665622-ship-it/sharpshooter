@@ -162,7 +162,7 @@ const FORT_A = games([[0, 2], [0, 1], [1, 2], [0, 0], [0, 1], [1, 3], [0, 2], [0
 const fort = run({ lamH: 1.9, lamA: 0.4, home: FORT_H, away: FORT_A, h2h: [{ hg: 2, ag: 0 }, { hg: 1, ag: 0 }, { hg: 3, ag: 0 }, { hg: 1, ag: 0 }] });
 t('fortress: BTTS No qualifies', R(fort, 'bttsNo').qualifies, `${R(fort, 'bttsNo').status} fails=${R(fort, 'bttsNo').failedGates}`);
 t('fortress: Over/BTTS Yes removed', R(fort, 'bttsYes').status === 'REMOVE' && !R(fort, 'over25').qualifies);
-t('fortress: away team-goals pick is the shutout leg', /U0\.5|U1\.5/.test(R(fort, 'teamGoals').pick.key), R(fort, 'teamGoals').pick.key);
+t('fortress: team goals never offers a team under (v5.2: retired)', !R(fort, 'teamGoals') || !/_U\d\.5$/.test(R(fort, 'teamGoals').pick.key), R(fort, 'teamGoals') && R(fort, 'teamGoals').pick.key);
 t('fortress: Home win methodology evaluated', R(fort, 'homeWin').prob > 0.6);
 
 // DRAW MACHINE: two low-scoring, drawing sides, no favourite.

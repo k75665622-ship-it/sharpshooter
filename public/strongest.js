@@ -101,10 +101,69 @@
     </article>`;
   }
 
-  function combinedStrip(list) {
+  const SLIP = {
+    safe: ['Safe slip', 'The strongest picks while the combined chance stays at {t}+'],
+    long: ['Longer slip', 'More legs for bigger odds, combined chance still {t}+'],
+    all: ['Every pick on one slip', 'Shown so you can see what it costs — not recommended'],
+  };
+
+  /** One slip of the day's Strongest Picks, with how slips built that way did on past matches. */
+  function slipCard(sl) {
+    const [name, sub] = SLIP[sl.id] || [sl.id, ''];
+    const mm = sl.measured;
+    const oneIn = sl.prob > 0 ? Math.max(1, Math.round(1 / sl.prob)) : null;
+    return `<div class="sp-slip s-${esc(sl.id)}">
+        <div class="sp-slip-h">
+          <span class="sp-slip-t">${esc(name)}</span>
+          <div class="sp-slip-f"><span>Chance</span><b>${p0(sl.prob)}</b></div>
+          <div class="sp-slip-f"><span>Fair odds</span><b>${dec(sl.fairOdds)}</b></div>
+        </div>
+        <div class="sp-slip-sub">${esc(sub.replace('{t}', p0(sl.target)))} · ${sl.size} legs</div>
+        <ol class="sp-slip-legs">${sl.legs.map((l) => `<li><span>${esc(fmtTime(l.kickoff))}</span><span><b>${esc(l.label)}</b> <small>${esc(l.home)} v ${esc(l.away)}</small></span><span>${p0(l.prob)}</span></li>`).join('')}</ol>
+        <div class="sp-slip-m">${mm && mm.n
+          ? `Slips built this way on past matches: <b>${pct(mm.landed, 1)}</b> landed (stated ${pct(mm.stated, 1)}, ${mm.n.toLocaleString('en-GB')} match days${mm.legs ? `, ${dec(mm.legs, 1)} legs on average` : ''}).`
+          : sl.id === 'all' && oneIn ? `About 1 chance in ${oneIn} that all ${sl.size} land.` : ''}
+          ${sl.id === 'all' ? ' Each extra pick is one more way to lose the whole slip.' : ''}
+          Bookmakers usually pay a little under the fair odds.</div>
+      </div>`;
+  }
+
+  /**
+   * The day's safe slip as first published (lib/strongest/record.js slipFor), once one of its legs
+   * has kicked off: the slip that was played, leg by leg, rather than one rebuilt from what is left.
+   */
+  function publishedCard(ps) {
+    if (!ps || !ps.legs || !ps.legs.length) return '';
+    const now = Date.now();
+    if (!ps.legs.some((l) => Date.parse(l.kickoff) <= now) && ps.hit == null) return '';
+    const st = ps.hit === 1 ? '<b class="pos">✓ Won</b>' : ps.hit === 0 ? '<b class="neg">✕ Lost</b>' : ps.result === 'void' ? 'void' : '<em class="muted-t">in play</em>';
+    const mark = (l) => (l.hit === 1 ? '<b class="pos">✓</b>' : l.hit === 0 ? '<b class="neg">✕</b>' : l.result === 'void' ? 'void' : Date.parse(l.kickoff) <= now ? '<small>…</small>' : '<small>to play</small>');
+    return `<div class="sp-slip s-safe s-published">
+        <div class="sp-slip-h">
+          <span class="sp-slip-t">Safe slip as published</span>
+          <div class="sp-slip-f"><span>Chance</span><b>${p0(ps.prob)}</b></div>
+          <div class="sp-slip-f"><span>Result</span><b class="sp-slip-st">${st}</b></div>
+        </div>
+        <div class="sp-slip-sub">Written down before its first kick-off (${esc(fmtTime(ps.recordedAt))}) and kept as it was · ${ps.size} legs · fair odds ${dec(ps.fairOdds)}</div>
+        <ol class="sp-slip-legs">${ps.legs.map((l) => `<li><span>${esc(fmtTime(l.kickoff))}</span><span><b>${esc(l.label)}</b> <small>${esc(l.home)} v ${esc(l.away)}${l.result && l.result !== 'void' ? ` · ${esc(l.result)}` : ''}</small></span><span>${mark(l)}</span></li>`).join('')}</ol>
+      </div>`;
+  }
+
+  /** The day's slips (lib/strongest/picks.js slips) with how slips built that way did. */
+  function slipsBlock(list, cfg) {
     if (!list || !list.length) return '';
-    return `<div class="sp-combo"><span class="sp-combo-k">Combine them</span>${list.map((c) => `<span class="sp-combo-i"><b>${c.all ? `All ${c.size}` : `Top ${c.size}`}</b> ${p0(c.prob)} <small>fair ${dec(c.fairOdds)}</small></span>`).join('')}
-      <span class="sp-combo-n">Picks are from different matches, so their chances multiply. Every extra leg lowers the chance of landing.</span></div>`;
+    const m = cfg && cfg.measured;
+    const by = (m && m.slips && m.slips.bySize) || {};
+    const sizes = Object.entries(by).sort((x, y) => Number(x[0]) - Number(y[0]));
+    const card = slipCard;
+    return `<div class="sec-title sp-sec">Slips from today's picks <span class="pill">${list.length}</span></div>
+      <p class="muted-t sp-note">Picks come from different matches, so on one slip their chances <b>multiply</b>. Even ${p0(cfg.minChance || 0.88)} picks lose together fast:
+        ten of them land only ${p0(Math.pow(cfg.minChance || 0.88, 10))} of the time. If you want to win often, keep slips short.</p>
+      <div class="sp-slips">${list.map(card).join('')}</div>
+      ${sizes.length ? `<details class="sp-more sp-bysize"><summary>How often a slip of N Strongest Picks landed on past matches</summary>
+        <div class="bt-table sp-bt"><div class="bt-row head"><span>Picks on the slip</span><span>Match days</span><span>Landed</span><span>Stated</span></div>
+        ${sizes.map(([k, v]) => `<div class="bt-row"><span>${esc(k)}</span><span>${v.n.toLocaleString('en-GB')}</span><span><b>${pct(v.landed, 1)}</b></span><span>${pct(v.stated, 1)}</span></div>`).join('')}</div>
+        <p class="muted-t">${esc(m.window || '')}, strongest picks first. The odds always tell the truth: a slip at 2.0 odds cannot land much more than half the time, however strong its legs.</p></details>` : ''}`;
   }
 
   function earlierBlock(rows) {
@@ -150,7 +209,7 @@
     if (!m || !m.all) return '';
     const fams = Object.entries(m.families || {}).filter(([, v]) => v.n >= 30).sort((a, b) => b[1].n - a[1].n);
     return `<div class="sec-title sp-sec">Measured on past matches <span class="pill">${esc(m.window || '')}</span></div>
-      <p class="muted-t sp-note">The same rules replayed on ${(m.matches || 0).toLocaleString('en-GB')} matches the models never saw (${esc(m.window || '')}), every pick settled on the real result${m.perMatchDay != null ? ` — about ${Math.round(m.perMatchDay)} picks a match day` : ''}.
+      <p class="muted-t sp-note">The same rules replayed on ${(m.matches || 0).toLocaleString('en-GB')} matches the models never saw (${esc(m.window || '')}), every pick settled on the real result${m.perMatchDay != null ? ` — about ${Math.round(m.perMatchDay)} picks a match day` : ''}${m.method ? ' (the replay rebuilds the bookmaker-anchored half of the rule; the site adds checks it cannot replay)' : ''}.
         A pick at ${p0(m.all.stated)} should win about ${p0(m.all.stated)} — and that is what happened: <b>${pct(m.all.hit, 1)}</b> of ${m.all.n.toLocaleString('en-GB')} won.
         Even so, roughly ${Math.round((1 - m.all.hit) * 100)} in 100 lose: a strong pick is not a certain one.</p>
       <div class="bt-table sp-bt sp-meas">
@@ -162,19 +221,23 @@
 
   function recordBlock(r, cfg) {
     if (!r) return '';
-    const P = r.picks || {};
+    // the current rule's own record; picks chosen under earlier versions are listed apart
+    const P = r.current || r.picks || {};
+    const older = Object.entries(r.byRule || {}).filter(([k, v]) => k !== r.rule && v.n);
+    const SL = r.slips || {};
     const tiers = (cfg.tiers || []).map((t) => {
       const s = (r.byTier || {})[t.name] || {};
       return `<div class="bt-row"><span><span class="sp-tier t-${tierCls(t.name)}">${esc(t.name)}</span> chance ${p0(t.min)}+</span><span>${s.n || 0}</span><span>${s.hitRate == null ? '—' : pct(s.hitRate, 1)}</span><span>${s.stated == null ? '—' : pct(s.stated, 1)}</span><span>${s.pending || 0}</span></div>`;
     }).join('');
     const groups = Object.entries(r.cards || {}).sort((a, b) => GROUPS.indexOf(a[0]) - GROUPS.indexOf(b[0]));
-    return `<div class="sec-title sp-sec">Track record <span class="pill">${P.n || 0} settled</span></div>
+    return `<div class="sec-title sp-sec">Track record${r.rule ? ` · rule v${esc(r.rule)}` : ''} <span class="pill">${P.n || 0} settled</span></div>
       <div class="sumstrip sp-rec">
         <div class="ss-cell"><div class="v">${P.hitRate == null ? '—' : pct(P.hitRate, 1)}</div><div class="k">Strongest Picks won</div></div>
         <div class="ss-cell"><div class="v">${P.stated == null ? '—' : pct(P.stated, 1)}</div><div class="k">Average stated chance</div></div>
         <div class="ss-cell"><div class="v">${P.won || 0}/${P.n || 0}</div><div class="k">Won / settled</div></div>
-        <div class="ss-cell"><div class="v">${P.pending || 0}</div><div class="k">Waiting for a result</div></div>
+        <div class="ss-cell"><div class="v">${SL.n ? `${SL.won}/${SL.n}` : '—'}</div><div class="k">${SL.n ? 'Safe slips landed' : 'Safe slips: none settled yet'}</div></div>
       </div>
+      ${older.length ? `<p class="muted-t sp-note">Picks chosen under earlier versions of the rule are kept apart: ${older.map(([k, v]) => `v${esc(k)} ${v.won}/${v.n} won (${pct(v.hitRate, 1)}, stated ${pct(v.stated, 1)})`).join(' · ')}.</p>` : ''}
       <p class="muted-t sp-note">Every pick is written down before kick-off and settled from ESPN and football-data.co.uk results; nothing is edited afterwards.
         A well-calibrated record wins about as often as its average stated chance. <a class="dl" href="/api/strongest/record?format=csv">Download CSV</a></p>
       <div class="bt-table sp-bt">
@@ -213,7 +276,7 @@
     const tierCount = (n) => picks.filter((p) => p.pick.tier === n).length;
     // the tiers a pick can carry (at or above the list's bar)
     const listTiers = (cfg.tiers || []).filter((t) => t.min >= (cfg.minChance || 0) - 1e-9);
-    const rec = d.record && d.record.picks;
+    const rec = d.record && (d.record.current || d.record.picks);
     const upcoming = (d.matches || []).filter((m) => !m.started);
 
     el.innerHTML = `<div class="m-intro sp-intro">
@@ -221,8 +284,9 @@
         <h2>The picks every view agrees on — at a measured chance</h2>
         <p>Each match is priced across SportyBet's nine markets — Goals, Corners, Half, Players, Minutes, Team, Match, Bookings and Special — by independent views:
         the bookmakers' price, a stats model, the v6 factors and a <b>possession model</b> (shots a game × goals per shot, for both sides). The chance shown is
-        <b>measured</b>: what picks like it actually won on past matches. A pick makes this list only at <b>${p0(cfg.minChance || 0.8)}+</b>
-        with every view at ${p0(cfg.floor)}+, the bookmakers' price behind it and no trap flagged. There is <b>no fixed number</b>: a weak day gives few picks.</p>
+        <b>measured</b>: what picks like it actually won on past matches. A pick makes this list only at <b>${p0(cfg.minChance || 0.88)}+</b>
+        with every view at ${p0(cfg.floor)}+, the bookmakers' price behind it, no trap flagged, in a league the rule was tested on, and never a team under,
+        clean sheet or "both teams to score: No" (they did not hold up). There is <b>no fixed number</b>: a weak day gives few picks.</p>
         <details class="sp-rules"><summary>How a pick qualifies</summary><ul class="rules">${(d.rules || []).map((r) => `<li>${esc(r)}</li>`).join('')}</ul></details>
       </div>
       <div class="sumstrip">
@@ -231,6 +295,8 @@
         <div class="ss-cell"><div class="v">${upcoming.length}</div><div class="k">Matches still to play</div></div>
         <div class="ss-cell"><div class="v">${rec && rec.hitRate != null ? pct(rec.hitRate, 0) : '—'}</div><div class="k">${rec && rec.n ? `Record: ${rec.won}/${rec.n} won` : 'Record starts today'}</div></div>
       </div>
+      ${publishedCard(d.publishedSlip) ? `<div class="sp-slips sp-pub">${publishedCard(d.publishedSlip)}</div>` : ''}
+      ${d.counts && d.counts.untested ? `<p class="muted-t sp-note">${d.counts.untested} upcoming match${d.counts.untested === 1 ? ' is' : 'es are'} in leagues the rule was never measured on, so ${d.counts.untested === 1 ? 'it gets' : 'they get'} no Strongest Pick. ${d.counts.untested === 1 ? 'Its' : 'Their'} markets still show on the match cards below.</p>` : ''}
       ${picks.length ? `<div class="sp-bar">
           <div class="filters sp-sort" role="group" aria-label="Sort picks">
             <button class="fchip ${SP.sort === 'strength' ? 'is-active' : ''}" data-sort="strength">Strongest first</button>
@@ -239,9 +305,9 @@
           <button class="sp-copy" id="spCopy">Copy picks</button>
         </div>
         <div class="sp-list">${picks.map((it, i) => pickCard(it, SP.sort === 'strength' ? i + 1 : null, cfg)).join('')}</div>
-        ${combinedStrip(d.combined)}`
+        ${slipsBlock(d.slips, cfg)}`
       : `<div class="empty sp-empty"><h3>No Strongest Pick ${upcoming.length ? 'yet' : 'today'}</h3>
-          <p>${upcoming.length ? `None of the ${upcoming.length} upcoming matches has a selection with a measured chance of ${p0(cfg.minChance || 0.8)} that every view backs. That is the filter working: a weak day gives no picks rather than forced ones.` : 'No upcoming matches were analysed for this date.'}</p></div>`}
+          <p>${upcoming.length ? `None of the ${upcoming.length} upcoming matches has a selection with a measured chance of ${p0(cfg.minChance || 0.88)} that every view backs. That is the filter working: a weak day gives no picks rather than forced ones.` : 'No upcoming matches were analysed for this date.'}</p></div>`}
       ${earlierBlock(d.earlier)}
       ${nearBlock(d.nearMisses)}
       ${(d.matches || []).length ? `<div class="sec-title sp-sec">Every match · nine markets <span class="pill">${d.matches.length}</span></div>
@@ -267,6 +333,14 @@
       });
     }
   }
+
+  /** The day's Strongest Picks for other tabs (the High Banker leads with their safe slip). */
+  window.strongestDay = function () {
+    if (SP.data && SP.date === state.date && !SP.loading) return Promise.resolve(SP.data);
+    return load(false).then((d) => d || (SP.date === state.date ? SP.data : null));
+  };
+  window.strongestSlipCard = slipCard;
+  window.strongestPublishedCard = publishedCard;
 
   /** Called by app.js when the tab is shown, the date changes or Refresh is pressed. */
   window.renderStrongest = function (force) {

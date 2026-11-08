@@ -2,15 +2,15 @@
   "dataset": "Club Football Match Data 2000-2025 (football-data.co.uk results + Bet365 / best-of-17 odds + ClubElo), 18 European divisions",
   "heldOut": "seasons 2023-24 to 2026-27 (not used to fit any v5 parameter)",
   "fixtures": 19991,
-  "rule": "v5.1: every hard gate, then 70% of the checklist (draw and correct score 85%)",
+  "rule": "v5.2: every hard gate, then 70% of the checklist (draw and correct score 85%); no team-under candidates",
   "headline": {
     "v5": {
-      "n": 12538,
-      "hitRate": 0.7207,
-      "statedProb": 0.7151,
-      "roiBet365": -0.0292,
-      "roiBestPrice": -0.0007,
-      "priced": 5683
+      "n": 11820,
+      "hitRate": 0.7193,
+      "statedProb": 0.7113,
+      "roiBet365": -0.0346,
+      "roiBestPrice": -0.005,
+      "priced": 6396
     },
     "v4": {
       "n": 6577,
@@ -23,34 +23,45 @@
   },
   "general": {
     "bestBet": {
-      "n": 18788,
-      "hitRate": 0.7332,
-      "statedProb": 0.7249,
-      "roiBet365": -0.0298,
-      "roiBestPrice": -0.0004,
-      "priced": 6597
+      "n": 18667,
+      "hitRate": 0.7326,
+      "statedProb": 0.7231,
+      "roiBet365": -0.0329,
+      "roiBestPrice": -0.0027,
+      "priced": 7294
     },
     "resultCall": {
-      "hitRate": 0.5095,
-      "statedProb": 0.5041
+      "hitRate": 0.5088,
+      "statedProb": 0.5027
     },
     "predictedScore": {
-      "exact": 0.1174,
-      "statedProb": 0.1066
+      "exact": 0.1332,
+      "statedProb": 0.1267
     },
     "mostLikelyScore": {
       "exact": 0.1332
+    },
+    "coherentScore": {
+      "exact": 0.1172
+    },
+    "top3Scores": {
+      "hit": 0.3406,
+      "statedProb": 0.3308
+    },
+    "goalsRange": {
+      "hit": 0.4684,
+      "statedProb": 0.4633
     }
   },
   "methods": {
     "over25": {
       "v5": {
-        "n": 3057,
-        "hitRate": 0.6477,
-        "statedProb": 0.6509,
-        "roiBet365": -0.0311,
-        "roiBestPrice": -0.0088,
-        "priced": 3057
+        "n": 2950,
+        "hitRate": 0.6515,
+        "statedProb": 0.6461,
+        "roiBet365": -0.0293,
+        "roiBestPrice": -0.0071,
+        "priced": 2950
       },
       "v4": {
         "n": 2105,
@@ -63,12 +74,12 @@
     },
     "under25": {
       "v5": {
-        "n": 1558,
-        "hitRate": 0.6181,
-        "statedProb": 0.6366,
-        "roiBet365": -0.0666,
-        "roiBestPrice": -0.0444,
-        "priced": 1558
+        "n": 1384,
+        "hitRate": 0.6134,
+        "statedProb": 0.6332,
+        "roiBet365": -0.0801,
+        "roiBestPrice": -0.0582,
+        "priced": 1384
       },
       "v4": {
         "n": 532,
@@ -81,9 +92,9 @@
     },
     "bttsYes": {
       "v5": {
-        "n": 1300,
-        "hitRate": 0.6315,
-        "statedProb": 0.619,
+        "n": 1412,
+        "hitRate": 0.6296,
+        "statedProb": 0.621,
         "roiBet365": null,
         "roiBestPrice": null,
         "priced": 0
@@ -99,9 +110,9 @@
     },
     "bttsNo": {
       "v5": {
-        "n": 146,
-        "hitRate": 0.6027,
-        "statedProb": 0.603,
+        "n": 125,
+        "hitRate": 0.592,
+        "statedProb": 0.6019,
         "roiBet365": null,
         "roiBestPrice": null,
         "priced": 0
@@ -121,9 +132,9 @@
     },
     "teamGoals": {
       "v5": {
-        "n": 4457,
-        "hitRate": 0.6807,
-        "statedProb": 0.6861,
+        "n": 1887,
+        "hitRate": 0.6921,
+        "statedProb": 0.6837,
         "roiBet365": null,
         "roiBestPrice": null,
         "priced": 0
@@ -139,12 +150,12 @@
     },
     "homeWin": {
       "v5": {
-        "n": 2526,
-        "hitRate": 0.7565,
-        "statedProb": 0.7478,
-        "roiBet365": -0.0152,
-        "roiBestPrice": 0.0101,
-        "priced": 1724
+        "n": 2488,
+        "hitRate": 0.752,
+        "statedProb": 0.7412,
+        "roiBet365": -0.0151,
+        "roiBestPrice": 0.0104,
+        "priced": 1792
       },
       "v4": {
         "n": 198,
@@ -159,7 +170,7 @@
       "v5": {
         "n": 245,
         "hitRate": 0.3143,
-        "statedProb": 0.3218,
+        "statedProb": 0.3234,
         "roiBet365": -0.0456,
         "roiBestPrice": -0.0007,
         "priced": 245
@@ -175,12 +186,12 @@
     },
     "awayWin": {
       "v5": {
-        "n": 913,
-        "hitRate": 0.7568,
-        "statedProb": 0.7253,
-        "roiBet365": 0.0104,
-        "roiBestPrice": 0.0418,
-        "priced": 561
+        "n": 931,
+        "hitRate": 0.7444,
+        "statedProb": 0.7197,
+        "roiBet365": -0.0025,
+        "roiBestPrice": 0.0286,
+        "priced": 615
       },
       "v4": {
         "n": 100,
@@ -193,9 +204,9 @@
     },
     "dogPlus": {
       "v5": {
-        "n": 3657,
-        "hitRate": 0.7397,
-        "statedProb": 0.7236,
+        "n": 3630,
+        "hitRate": 0.7364,
+        "statedProb": 0.7238,
         "roiBet365": null,
         "roiBestPrice": null,
         "priced": 0
@@ -229,20 +240,20 @@
     },
     "doubleChance": {
       "v5": {
-        "n": 3233,
-        "hitRate": 0.7702,
-        "statedProb": 0.76,
-        "roiBet365": -0.0361,
-        "roiBestPrice": 0.0011,
-        "priced": 3233
+        "n": 3213,
+        "hitRate": 0.7644,
+        "statedProb": 0.7596,
+        "roiBet365": -0.0372,
+        "roiBestPrice": 0.0001,
+        "priced": 3213
       },
       "v4": null
     },
     "correctScore": {
       "v5": {
-        "n": 437,
-        "hitRate": 0.1762,
-        "statedProb": 0.1499,
+        "n": 414,
+        "hitRate": 0.1787,
+        "statedProb": 0.1503,
         "roiBet365": null,
         "roiBestPrice": null,
         "priced": 0
@@ -256,22 +267,22 @@
       "min": 0.8,
       "label": "80%+ chance",
       "heldOut": {
-        "n": 1143,
-        "hitRate": 0.8556,
-        "statedProb": 0.8427,
-        "roiBet365": 0.0063,
-        "roiBestPrice": 0.0297,
-        "priced": 616,
-        "perMatchDay": 1.4
+        "n": 850,
+        "hitRate": 0.8647,
+        "statedProb": 0.8437,
+        "roiBet365": 0.0153,
+        "roiBestPrice": 0.0389,
+        "priced": 543,
+        "perMatchDay": 1.1
       },
       "tuning": {
-        "n": 1560,
-        "hitRate": 0.8397,
-        "statedProb": 0.8425,
-        "roiBet365": -0.0174,
-        "roiBestPrice": 0.0075,
-        "priced": 749,
-        "perMatchDay": 1.5
+        "n": 1044,
+        "hitRate": 0.8458,
+        "statedProb": 0.8446,
+        "roiBet365": -0.0205,
+        "roiBestPrice": 0.0042,
+        "priced": 675,
+        "perMatchDay": 1
       }
     },
     {
@@ -279,22 +290,22 @@
       "min": 0.7,
       "label": "70-80% chance",
       "heldOut": {
-        "n": 10569,
-        "hitRate": 0.7626,
-        "statedProb": 0.753,
-        "roiBet365": -0.0295,
-        "roiBestPrice": 0.0035,
-        "priced": 4663,
-        "perMatchDay": 14.6
+        "n": 8782,
+        "hitRate": 0.7655,
+        "statedProb": 0.7536,
+        "roiBet365": -0.03,
+        "roiBestPrice": 0.0033,
+        "priced": 4555,
+        "perMatchDay": 12.3
       },
       "tuning": {
-        "n": 14559,
-        "hitRate": 0.7511,
-        "statedProb": 0.7535,
-        "roiBet365": -0.0373,
-        "roiBestPrice": 0.0016,
-        "priced": 6230,
-        "perMatchDay": 15.2
+        "n": 11432,
+        "hitRate": 0.7542,
+        "statedProb": 0.755,
+        "roiBet365": -0.0384,
+        "roiBestPrice": 0.0006,
+        "priced": 6107,
+        "perMatchDay": 12.2
       }
     },
     {
@@ -302,22 +313,22 @@
       "min": 0.6,
       "label": "60-70% chance",
       "heldOut": {
-        "n": 7543,
-        "hitRate": 0.6512,
-        "statedProb": 0.6456,
-        "roiBet365": -0.0351,
-        "roiBestPrice": -0.011,
-        "priced": 4298,
-        "perMatchDay": 9.8
+        "n": 7374,
+        "hitRate": 0.6505,
+        "statedProb": 0.6437,
+        "roiBet365": -0.0384,
+        "roiBestPrice": -0.0143,
+        "priced": 4251,
+        "perMatchDay": 9.5
       },
       "tuning": {
-        "n": 9920,
-        "hitRate": 0.6536,
-        "statedProb": 0.6443,
-        "roiBet365": -0.0186,
-        "roiBestPrice": 0.0142,
-        "priced": 5916,
-        "perMatchDay": 9.7
+        "n": 9373,
+        "hitRate": 0.6513,
+        "statedProb": 0.6418,
+        "roiBet365": -0.0215,
+        "roiBestPrice": 0.0109,
+        "priced": 5720,
+        "perMatchDay": 9.2
       }
     },
     {
@@ -325,22 +336,22 @@
       "min": 0.5,
       "label": "50-60% chance",
       "heldOut": {
-        "n": 1860,
-        "hitRate": 0.5661,
-        "statedProb": 0.5778,
-        "roiBet365": -0.0922,
-        "roiBestPrice": -0.0693,
-        "priced": 556,
-        "perMatchDay": 2.4
+        "n": 1735,
+        "hitRate": 0.5695,
+        "statedProb": 0.5831,
+        "roiBet365": -0.0896,
+        "roiBestPrice": -0.0668,
+        "priced": 605,
+        "perMatchDay": 2.2
       },
       "tuning": {
-        "n": 2312,
-        "hitRate": 0.577,
-        "statedProb": 0.5765,
-        "roiBet365": -0.0305,
-        "roiBestPrice": 0.0054,
-        "priced": 669,
-        "perMatchDay": 2.3
+        "n": 2063,
+        "hitRate": 0.5986,
+        "statedProb": 0.5833,
+        "roiBet365": -0.0108,
+        "roiBestPrice": 0.0253,
+        "priced": 723,
+        "perMatchDay": 2
       }
     },
     {
@@ -348,24 +359,24 @@
       "min": 0,
       "label": "under 50% chance",
       "heldOut": {
-        "n": 1135,
-        "hitRate": 0.3031,
-        "statedProb": 0.3096,
+        "n": 659,
+        "hitRate": 0.2291,
+        "statedProb": 0.2147,
         "roiBet365": -0.0456,
         "roiBestPrice": -0.0007,
         "priced": 245,
-        "perMatchDay": 1.4
+        "perMatchDay": 0.8
       },
       "tuning": {
-        "n": 2073,
-        "hitRate": 0.301,
-        "statedProb": 0.3079,
+        "n": 1230,
+        "hitRate": 0.2098,
+        "statedProb": 0.2237,
         "roiBet365": -0.0013,
         "roiBestPrice": 0.0552,
         "priced": 498,
-        "perMatchDay": 2
+        "perMatchDay": 1.2
       }
     }
   ],
-  "generatedAt": "2026-10-31"
+  "generatedAt": "2026-11-08"
 }

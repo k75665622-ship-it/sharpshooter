@@ -286,141 +286,266 @@
   }
  },
  "measured": {
+  "rule": "v3.0: 88% measured chance (89% corners and bookings), every view 75%+, bookmakers at most 93%, 13 weak markets kept off",
+  "method": "price-anchored replay (research/v6/slips_study.js): the bookmaker-anchored and possession views; the v6 factor and stats views and the trap checks cannot be rebuilt on the archive, so the site adds checks the replay does not",
   "window": "Jul 2023 – Sept 2026",
   "matches": 29191,
-  "perMatchDay": 19.4,
-  "pickShare": 0.627,
+  "matchDays": 771,
+  "perMatchDay": 7.8,
+  "pickShare": 0.2058,
   "all": {
-   "n": 18309,
-   "hit": 0.864,
-   "stated": 0.867
+   "n": 6008,
+   "hit": 0.9056,
+   "stated": 0.9058
   },
   "tiers": {
    "Strong": {
-    "n": 10188,
-    "hit": 0.855,
-    "stated": 0.856
+    "n": 2380,
+    "hit": 0.8903,
+    "stated": 0.8914
    },
    "Elite": {
-    "n": 8121,
-    "hit": 0.876,
-    "stated": 0.88
+    "n": 3628,
+    "hit": 0.9157,
+    "stated": 0.9153
    }
   },
   "families": {
    "12": {
-    "n": 396,
-    "hit": 0.833,
-    "stated": 0.862,
+    "n": 155,
+    "hit": 0.8968,
+    "stated": 0.899,
     "label": "Either team to win"
    },
-   "TT_U2.5": {
-    "n": 9622,
-    "hit": 0.862,
-    "stated": 0.869,
-    "label": "Team under 2.5 goals"
-   },
-   "TT_O0.5": {
-    "n": 3354,
-    "hit": 0.869,
-    "stated": 0.862,
-    "label": "Team to score"
-   },
-   "H2_O0.5": {
-    "n": 1095,
-    "hit": 0.861,
-    "stated": 0.865,
-    "label": "Goal in the 2nd half"
-   },
    "DC": {
-    "n": 948,
-    "hit": 0.86,
-    "stated": 0.865,
+    "n": 1081,
+    "hit": 0.9167,
+    "stated": 0.9092,
     "label": "Double chance"
    },
-   "O1.5": {
-    "n": 656,
-    "hit": 0.87,
-    "stated": 0.863,
-    "label": "Over 1.5 goals"
+   "TT_O0.5": {
+    "n": 2443,
+    "hit": 0.9108,
+    "stated": 0.905,
+    "label": "Team to score"
+   },
+   "WEH_H": {
+    "n": 76,
+    "hit": 0.8947,
+    "stated": 0.9191,
+    "label": "Home to win either half"
+   },
+   "K_U": {
+    "n": 208,
+    "hit": 0.8462,
+    "stated": 0.9055,
+    "label": "Cards under"
    },
    "C_TEAM_O": {
-    "n": 651,
-    "hit": 0.866,
-    "stated": 0.87,
+    "n": 618,
+    "hit": 0.9013,
+    "stated": 0.906,
     "label": "Team corners over"
    },
    "K_O": {
-    "n": 647,
-    "hit": 0.862,
-    "stated": 0.87,
+    "n": 1078,
+    "hit": 0.9017,
+    "stated": 0.9047,
     "label": "Cards over"
    },
-   "U3.5": {
-    "n": 568,
-    "hit": 0.871,
-    "stated": 0.858,
-    "label": "Under 3.5 goals"
-   },
-   "K_U": {
-    "n": 202,
-    "hit": 0.881,
-    "stated": 0.87,
-    "label": "Cards under"
-   },
-   "H1_O0.5": {
-    "n": 89,
-    "hit": 0.921,
-    "stated": 0.864,
-    "label": "Goal in the 1st half"
-   },
-   "WEH_H": {
-    "n": 34,
-    "hit": 0.853,
-    "stated": 0.891,
-    "label": "Home to win either half"
-   },
-   "C_O": {
-    "n": 16,
-    "hit": 0.875,
-    "stated": 0.871,
-    "label": "Total corners over"
-   },
-   "C_MOST": {
-    "n": 14,
-    "hit": 1,
-    "stated": 0.874,
-    "label": "Most corners"
-   },
-   "C_U": {
-    "n": 6,
-    "hit": 0.833,
-    "stated": 0.867,
-    "label": "Total corners under"
-   },
-   "WIN": {
-    "n": 3,
-    "hit": 1,
-    "stated": 0.865,
-    "label": "Match winner"
-   },
-   "WEH_A": {
-    "n": 3,
-    "hit": 1,
-    "stated": 0.882,
-    "label": "Away to win either half"
+   "O1.5": {
+    "n": 264,
+    "hit": 0.8939,
+    "stated": 0.9038,
+    "label": "Over 1.5 goals"
    },
    "DC1X_O1.5": {
-    "n": 3,
-    "hit": 1,
-    "stated": 0.864,
+    "n": 9,
+    "hit": 0.7778,
+    "stated": 0.9271,
     "label": "Home or draw & over 1.5"
    },
-   "TT_O1.5": {
-    "n": 2,
+   "WIN": {
+    "n": 4,
     "hit": 1,
-    "stated": 0.862,
-    "label": "Team over 1.5 goals"
+    "stated": 0.9225,
+    "label": "Match winner"
+   },
+   "H2_O0.5": {
+    "n": 36,
+    "hit": 0.8889,
+    "stated": 0.9138,
+    "label": "Goal in the 2nd half"
+   },
+   "C_MOST": {
+    "n": 5,
+    "hit": 1,
+    "stated": 0.9105,
+    "label": "Most corners"
+   },
+   "C_O": {
+    "n": 1,
+    "hit": 1,
+    "stated": 0.9185,
+    "label": "Total corners over"
+   },
+   "U3.5": {
+    "n": 30,
+    "hit": 0.9333,
+    "stated": 0.8886,
+    "label": "Under 3.5 goals"
+   }
+  },
+  "slips": {
+   "safe": {
+    "target": 0.75,
+    "n": 613,
+    "landed": 0.8042,
+    "stated": 0.7954,
+    "legs": 2.7,
+    "fairOdds": 1.28
+   },
+   "long": {
+    "target": 0.6,
+    "n": 613,
+    "landed": 0.6786,
+    "stated": 0.6816,
+    "legs": 4.3,
+    "fairOdds": 1.51
+   },
+   "all": {
+    "n": 771,
+    "landed": 0.5681,
+    "stated": 0.5791,
+    "legs": 7.8
+   },
+   "bySize": {
+    "1": {
+     "n": 771,
+     "landed": 0.917,
+     "stated": 0.9184
+    },
+    "2": {
+     "n": 613,
+     "landed": 0.8336,
+     "stated": 0.8421
+    },
+    "3": {
+     "n": 502,
+     "landed": 0.8048,
+     "stated": 0.7717
+    },
+    "4": {
+     "n": 433,
+     "landed": 0.6952,
+     "stated": 0.7059
+    },
+    "5": {
+     "n": 363,
+     "landed": 0.6556,
+     "stated": 0.6467
+    },
+    "6": {
+     "n": 313,
+     "landed": 0.6102,
+     "stated": 0.5916
+    },
+    "8": {
+     "n": 262,
+     "landed": 0.5038,
+     "stated": 0.4898
+    },
+    "10": {
+     "n": 230,
+     "landed": 0.4,
+     "stated": 0.4019
+    },
+    "15": {
+     "n": 158,
+     "landed": 0.2468,
+     "stated": 0.2434
+    }
+   }
+  },
+  "tuning": {
+   "window": "Jul 2019 – Jun 2023",
+   "matches": 47337,
+   "perMatchDay": 9.3,
+   "all": {
+    "n": 11129,
+    "hit": 0.9074,
+    "stated": 0.9067
+   },
+   "slips": {
+    "safe": {
+     "target": 0.75,
+     "n": 1011,
+     "landed": 0.8042,
+     "stated": 0.7918,
+     "legs": 2.7,
+     "fairOdds": 1.28
+    },
+    "long": {
+     "target": 0.6,
+     "n": 1011,
+     "landed": 0.6864,
+     "stated": 0.6764,
+     "legs": 4.4,
+     "fairOdds": 1.52
+    },
+    "all": {
+     "n": 1195,
+     "landed": 0.5506,
+     "stated": 0.5418,
+     "legs": 9.3
+    },
+    "bySize": {
+     "1": {
+      "n": 1195,
+      "landed": 0.923,
+      "stated": 0.9194
+     },
+     "2": {
+      "n": 1011,
+      "landed": 0.8526,
+      "stated": 0.8418
+     },
+     "3": {
+      "n": 864,
+      "landed": 0.7766,
+      "stated": 0.7704
+     },
+     "4": {
+      "n": 743,
+      "landed": 0.7174,
+      "stated": 0.7036
+     },
+     "5": {
+      "n": 649,
+      "landed": 0.6533,
+      "stated": 0.6422
+     },
+     "6": {
+      "n": 565,
+      "landed": 0.5858,
+      "stated": 0.5871
+     },
+     "8": {
+      "n": 450,
+      "landed": 0.4911,
+      "stated": 0.4883
+     },
+     "10": {
+      "n": 373,
+      "landed": 0.3807,
+      "stated": 0.406
+     },
+     "15": {
+      "n": 274,
+      "landed": 0.2226,
+      "stated": 0.2509
+     }
+    }
    }
   }
  },
@@ -428,65 +553,65 @@
   "measured": {
    "window": "Jul 2023 – Sept 2026",
    "matches": 29191,
-   "builders": 21063,
-   "share": 0.722,
-   "perMatchDay": 22.3,
+   "builders": 21022,
+   "share": 0.72,
+   "perMatchDay": 22.2,
    "all": {
-    "n": 21061,
-    "landed": 0.327,
-    "stated": 0.328,
-    "multiplied": 0.326
+    "n": 21020,
+    "landed": 0.328,
+    "stated": 0.327,
+    "multiplied": 0.324
    },
    "kinds": {
     "cards+corners+goals": {
-     "n": 10124,
-     "landed": 0.329,
-     "stated": 0.327,
-     "multiplied": 0.327
+     "n": 11177,
+     "landed": 0.33,
+     "stated": 0.326,
+     "multiplied": 0.326
     },
     "corners+goals": {
-     "n": 9188,
-     "landed": 0.323,
+     "n": 8091,
+     "landed": 0.325,
+     "stated": 0.328,
+     "multiplied": 0.322
+    },
+    "cards+goals": {
+     "n": 1270,
+     "landed": 0.331,
      "stated": 0.328,
      "multiplied": 0.324
     },
-    "cards+goals": {
-     "n": 1330,
-     "landed": 0.335,
-     "stated": 0.329,
-     "multiplied": 0.325
-    },
     "cards+corners": {
-     "n": 367,
-     "landed": 0.324,
-     "stated": 0.33,
-     "multiplied": 0.328
+     "n": 423,
+     "landed": 0.333,
+     "stated": 0.329,
+     "multiplied": 0.326
     },
     "goals": {
-     "n": 52,
-     "landed": 0.25,
+     "n": 59,
+     "landed": 0.305,
      "stated": 0.326,
      "multiplied": 0.275
     }
    },
    "size": {
     "3": {
-     "n": 20787,
-     "landed": 0.326,
-     "stated": 0.328,
-     "multiplied": 0.326
+     "n": 20617,
+     "landed": 0.329,
+     "stated": 0.327,
+     "multiplied": 0.325
     },
     "4": {
-     "n": 249,
-     "landed": 0.353,
-     "stated": 0.327,
-     "multiplied": 0.309
+     "n": 370,
+     "landed": 0.297,
+     "stated": 0.325,
+     "multiplied": 0.307
     },
     "5": {
-     "n": 25,
-     "landed": 0.24,
+     "n": 33,
+     "landed": 0.212,
      "stated": 0.329,
-     "multiplied": 0.296
+     "multiplied": 0.287
     }
    }
   }

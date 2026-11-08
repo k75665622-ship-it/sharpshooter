@@ -98,6 +98,15 @@ const entries = {
   h: base({ kind: 'card', fixture: 'f2', home: 'Arsenal', away: 'Everton', fd: { home: 'Arsenal', away: 'Everton' }, group: 'Minutes', key: 'M30_N', label: 'Goal in minutes 1-30: No' }),
   i: base({ kind: 'card', fixture: 'f2', home: 'Arsenal', away: 'Everton', fd: { home: 'Arsenal', away: 'Everton' }, group: 'Match', key: 'X', label: 'Draw' }),
   j: base({ kind: 'pick', fixture: 'f9', home: 'Lost FC', away: 'Nowhere', date: `${iso(old)}T15:00:00Z`, group: 'Match', key: '1', label: 'Lost FC to win', tier: 'Solid' }),
+  // safe slips: each leg settled on its own match
+  k: base({ kind: 'slip', rule: '3.0', fixture: 'slip-a', day: dayISO, group: 'Slip', key: 'SAFE', label: 'Safe slip (2 legs)', size: 2, prob: 0.8, legs: [
+    { fixture: 'f1', league: 'eng.1', date: kick, home: 'Man City', away: 'Aston Villa', fd: null, key: 'H2_O0.5', label: '2nd half over 0.5 goals', prob: 0.9 },
+    { fixture: 'f2', league: 'eng.1', date: kick, home: 'Arsenal', away: 'Everton', fd: { home: 'Arsenal', away: 'Everton' }, key: '1X', label: 'Arsenal or draw', prob: 0.9 },
+  ] }),
+  l: base({ kind: 'slip', rule: '3.0', fixture: 'slip-b', day: dayISO, group: 'Slip', key: 'SAFE', label: 'Safe slip (2 legs)', size: 2, prob: 0.78, legs: [
+    { fixture: 'f1', league: 'eng.1', date: kick, home: 'Man City', away: 'Aston Villa', fd: null, key: 'O2.5', label: 'Over 2.5 goals', prob: 0.88 },
+    { fixture: 'f2', league: 'eng.1', date: kick, home: 'Arsenal', away: 'Everton', fd: { home: 'Arsenal', away: 'Everton' }, key: '1X', label: 'Arsenal or draw', prob: 0.89 },
+  ] }),
 };
 const byMonth = {};
 for (const [k, e] of Object.entries(entries)) {
@@ -113,7 +122,9 @@ for (const [ym, book] of Object.entries(byMonth)) fs.writeFileSync(path.join(REC
     const n = await REC.settleAll({ force: true });
     const got = Object.fromEntries(REC.all().map((e) => [`${e.fixture}|${e.key}`, e]));
     const hit = (k) => got[k] && got[k].hit;
-    t('settled the entries the free sources can answer', n === 8, n);
+    t('settled the entries the free sources can answer', n === 10, n);
+    t('a safe slip whose every leg won is won', got['slip-a|SAFE'] && got['slip-a|SAFE'].hit === 1 && got['slip-a|SAFE'].legs.every((l) => l.hit === 1), JSON.stringify(got['slip-a|SAFE']));
+    t('a safe slip with one losing leg is lost (2-0 was under 2.5 goals)', got['slip-b|SAFE'] && got['slip-b|SAFE'].hit === 0 && got['slip-b|SAFE'].legs[0].hit === 0, JSON.stringify(got['slip-b|SAFE'] && got['slip-b|SAFE'].legs));
     t('2nd half over 0.5 won (goal on 70 minutes, half-time from ESPN goal times)', hit('f1|H2_O0.5') === 1 && got['f1|H2_O0.5'].ht === '1-0', JSON.stringify(got['f1|H2_O0.5']));
     t('goal in 1-15 won (12th minute)', hit('f1|M15_Y') === 1);
     t('Haaland to score won (matched by full name)', hit('f1|PL_H_0') === 1);
@@ -129,24 +140,36 @@ for (const [ym, book] of Object.entries(byMonth)) fs.writeFileSync(path.join(REC
     console.log('\n2. Reading the record');
     const s = REC.summary();
     t('summary counts settled Strongest Picks only', s.picks.n === 2 && s.picks.won === 2 && s.picks.void === 1, JSON.stringify(s.picks));
-    t('summary per tier', s.byTier.Strong.n === 2 && s.byTier.Solid.void === 1);
+    t('picks from before the rule had a version count as v2.0, apart from the current rule', s.byRule['2.0'].n === 2 && s.current.n === 0 && s.byTier.Strong.n === 0);
+    t('the safe slips have a record of their own', s.slips.n === 2 && s.slips.won === 1 && s.recentSlips.length === 2 && s.recentSlips[0].legs.length === 2, JSON.stringify(s.slips));
     t('summary per market group for match-card picks', s.cards.Minutes && s.cards.Minutes.n === 1 && s.cards.Minutes.pending === 1);
     t('recent list is newest first and carries the result', s.recent.length === 3 && s.recent.every((e) => 'hit' in e));
     t('picks for a date', REC.forDate(dayISO).length === 2);
-    t('CSV export', REC.toCsv().startsWith('date,kind,league') && REC.toCsv().split('\n').length === 11);
+    t('CSV export', REC.toCsv().startsWith('date,kind,league') && REC.toCsv().split('\n').length === 13);
 
     console.log('\n3. Recording before kick-off');
     const future = new Date(Date.now() + 2 * 3600 * 1000).toISOString();
     const day = {
-      picks: [{ match: { id: 'f20', league: 'eng.1', leagueName: 'Premier League', date: future, home: { name: 'Chelsea' }, away: { name: 'Spurs' }, fd: { home: 'Chelsea', away: 'Tottenham' } }, pick: { key: 'O1.5', group: 'Goals', label: 'Over 1.5 goals', prob: 0.8, floor: 0.77, views: { market: 0.8, stats: 0.77 }, tier: 'Solid' } }],
+      date: iso(new Date(Date.now() + 2 * 3600 * 1000)),
+      picks: [
+        { match: { id: 'f20', league: 'eng.1', leagueName: 'Premier League', date: future, home: { name: 'Chelsea' }, away: { name: 'Spurs' }, fd: { home: 'Chelsea', away: 'Tottenham' } }, pick: { key: 'O1.5', group: 'Goals', label: 'Over 1.5 goals', prob: 0.9, floor: 0.87, views: { market: 0.9, stats: 0.87 }, tier: 'Elite' } },
+        { match: { id: 'f22', league: 'eng.1', leagueName: 'Premier League', date: future, home: { name: 'Leeds' }, away: { name: 'Fulham' }, fd: null }, pick: { key: 'TTH_O0.5', group: 'Team', label: 'Leeds to score', prob: 0.89, floor: 0.86, views: { market: 0.89, stats: 0.86 }, tier: 'Strong' } },
+      ],
+      slips: [{ id: 'safe', size: 2, prob: 0.801, fairOdds: 1.248, legs: [{ fixture: 'f20', key: 'O1.5' }, { fixture: 'f22', key: 'TTH_O0.5' }] }],
       matches: [
         { started: false, match: { id: 'f20', league: 'eng.1', date: future, home: { name: 'Chelsea' }, away: { name: 'Spurs' } }, cards: [{ group: 'Goals', key: 'O1.5', label: 'Over 1.5 goals', prob: 0.8, floor: 0.77, views: {} }, { group: 'Players', none: true }] },
         { started: true, match: { id: 'f21', league: 'eng.1', date: kick, home: { name: 'A' }, away: { name: 'B' } }, cards: [{ group: 'Goals', key: 'O2.5', label: 'Over 2.5 goals', prob: 0.6, floor: 0.55, views: {} }] },
       ],
     };
     const added = REC.record(day);
-    t('a pick and its match card are written before kick-off', added === 2, added);
+    t('two picks, a match card and the safe slip are written before kick-off', added === 4, added);
     t('names are stored as plain text', REC.all().find((e) => e.fixture === 'f20' && e.kind === 'pick').home === 'Chelsea');
+    t('every new entry carries the rule it was chosen under', REC.all().filter((e) => e.fixture === 'f20' || e.kind === 'slip' && e.day === day.date).every((e) => e.rule === require('../lib/strongest/config').version));
+    const slip = REC.all().find((e) => e.kind === 'slip' && e.day === day.date);
+    t('the safe slip keeps its legs as published', slip && slip.size === 2 && slip.legs.map((l) => l.key).join(',') === 'O1.5,TTH_O0.5' && slip.legs[0].home === 'Chelsea', JSON.stringify(slip));
+    const pub = REC.slipFor(day.date);
+    t('the page gets the day\'s published safe slip with its legs', pub && pub.size === 2 && pub.legs.length === 2 && pub.legs[1].label === 'Leeds to score' && pub.hit === null, JSON.stringify(pub));
+    t('no slip published for a day -> none', REC.slipFor('2001-01-01') === null);
     t('writing again changes nothing (first write wins)', REC.record(day) === 0);
     t('a match that has kicked off is never written', !REC.all().some((e) => e.fixture === 'f21'));
   } catch (err) {

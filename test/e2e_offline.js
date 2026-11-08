@@ -369,6 +369,11 @@ global.fetch = async (input, init) => {
     t('strongest: reasons quote real numbers, never undefined / NaN', sp.matches.every((m) => m.cards.every((c) => c.none || (c.reasons || []).every((r) => !/undefined|NaN/.test(r)))));
     t('strongest: picks recorded before kick-off', sp.record && sp.record.picks.pending >= sp.picks.length, JSON.stringify(sp.record && sp.record.picks));
     t('strongest: rules and thresholds published', Array.isArray(sp.rules) && sp.rules.length >= 4 && sp.config.floor === 0.75);
+    t('strongest: slips are published, each the product of its legs (different matches)', Array.isArray(sp.slips) && sp.slips.length === (sp.picks.length >= 2 ? 1 : 0)
+      && sp.slips.every((sl) => sl.size >= 2 && Math.abs(sl.prob - sl.legs.reduce((a, l) => a * l.prob, 1)) < 1e-3 && new Set(sl.legs.map((l) => l.fixture)).size === sl.size), JSON.stringify(sp.slips));
+    t('strongest: no team under, clean sheet or BTTS No on the list or the match cards', sp.picks.every((p) => !sp.config.excluded.includes(p.pick.key)) && sp.matches.every((m) => m.cards.every((c) => c.none || !sp.config.excluded.includes(c.key))));
+    t('strongest: the slips\' measured record is published', sp.config.measured && sp.config.measured.slips && sp.config.measured.slips.safe.landed > 0.7 && sp.config.measured.slips.bySize['10'].landed < 0.5);
+    t('strongest: the record says whether it survives a restart', sp.record && sp.record.persist && sp.record.persist.enabled === false);
     const spRec = (await get('/api/strongest/record')).body;
     t('strongest: track record endpoint', spRec.picks && spRec.byTier && Array.isArray(spRec.recent));
     const spCsv = await get('/api/strongest/record?format=csv');
@@ -457,6 +462,9 @@ global.fetch = async (input, init) => {
         await settle(1200);
         const txt = w.document.querySelector('#board').textContent;
         t(`${view} tab renders`, txt.length > 40 && !/Analysis failed|Could not load/.test(txt), txt.slice(0, 160));
+        if (view === 'banker') {
+          t('High Banker tab leads with the safest slip and says how often a 3.0 slip lands', /Safest slip today/.test(txt) && /Read this first/.test(txt) && /1 day in \d/.test(txt), [/Safest slip today/.test(txt), /Read this first/.test(txt), /1 day in \d/.test(txt)].join() + ' ' + txt.replace(/\s+/g, ' ').slice(0, 400));
+        }
         if (view === 'strongest') {
           t('Strongest Picks tab shows the picks and the nine-market cards', /The picks every view agrees on/.test(txt) && w.document.querySelectorAll('.sp-mc').length === 2 && w.document.querySelectorAll('.sp-row').length === 18, txt.slice(0, 200));
           w.document.querySelector('[data-group="Corners"]').click();

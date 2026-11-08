@@ -1,13 +1,13 @@
 {
   "name": "sharpshooter",
-  "version": "6.0.0",
+  "version": "6.2.0",
   "private": true,
   "description": "Football prediction engine \u2014 v6 match intelligence (170 measured factors on top of the bookmaker price, trained on 134,579 matches), polite free-data crawler, thirteen market methodologies and a double-confirmed accumulator.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "verify": "node test/banker_unit.js && node test/daybook_unit.js && node test/v6_unit.js && node test/v5_unit.js && node test/strongest_unit.js && node test/strongest_record.js && node test/betbuilder_unit.js && node test/e2e_offline.js && node test_crosscheck.js && node test_consensus_price.js && node test_news.js && node test_quota.js && node test_methodology.js && node test_pricebacktest.js",
+    "verify": "node test/banker_unit.js && node test/daybook_unit.js && node test/v6_unit.js && node test/v5_unit.js && node test/strongest_unit.js && node test/strongest_record.js && node test/betbuilder_unit.js && node test/persist_unit.js && node test/e2e_offline.js && node test_crosscheck.js && node test_consensus_price.js && node test_news.js && node test_quota.js && node test_methodology.js && node test_pricebacktest.js",
     "test:strongest": "node test/strongest_unit.js && node test/strongest_record.js",
     "test:betbuilder": "node test/betbuilder_unit.js",
     "test:engine": "node test_engine.js",
