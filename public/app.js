@@ -14,7 +14,7 @@ const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 // The five sections and the views inside each (public/index.html: .section and .tab).
 const SECTIONS = {
   today: ['today'],
-  picks: ['strongest', 'tiers', 'top', 'predictions'],
+  picks: ['strongest', 'predictions', 'tiers', 'top'],
   slips: ['banker', 'betbuilder', 'acca'],
   matches: ['matches', 'general'],
   more: ['record', 'method'],
@@ -1321,7 +1321,7 @@ function renderAcca() {
       <div class="al-w"><span class="badge st-${statusMeta(l.methodology.status).cls}">${esc(statusMeta(l.methodology.status).label)}</span> ${esc(l.methodology.name)}
         <span class="tag ok">${l.agreement === 'main' ? 'Normal: main pick' : l.agreement === 'safer' ? 'Normal: safer form of its pick' : 'Normal: agrees (' + esc([l.normal.calls.result, l.normal.calls.goals].filter(Boolean).join(', ')) + ')'}</span></div>
     </div>`;
-  el.innerHTML = `<div class="m-intro"><h2>Accumulator — double-confirmed</h2>
+  el.innerHTML = `<div class="m-intro"><h2>Methodology slips: double-confirmed</h2>
       <p>A match only goes in when <b>two independent layers agree</b>: the selection <b>qualifies under a methodology</b> (Lock or Predict), and the
       <b>normal prediction says the same thing</b> — it is the normal main pick, a safer form of it, or it matches the normal prediction's result / goals / BTTS call
       with at least ${pct(0.6, 0)} probability. Anything the normal prediction flags as overrated by the bookmakers is left out.</p>

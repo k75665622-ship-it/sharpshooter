@@ -2,6 +2,11 @@
 
 > **Upgraded from v2.5 UNDER.** The biggest redesign in v5 — because the data demanded it.
 > Core rules: `00-CORE-v5.md`. Code: `lib/methodology/goals.js` → `under25`.
+>
+> **v5.3 (November 2026): the floor is 65%.** With the 60% floor the methodology won 61.3% of 1,384 picks in
+> 2023-26 where it said 63.3% (-8.0% at Bet365); the losses sat between 60% and 65%. From 65% it wins what it
+> says: 68.6% of 283 (tuning seasons 67.6% of 512).
+> Measured in `research/v7/RESULTS.md`, section 5.
 
 ---
 
@@ -39,7 +44,7 @@ including 2023-26. **Under 2.5 is still the weakest goals market. Treat it with 
 
 | Gate | Rule | Pass criteria |
 |---|---|---|
-| **MODEL** | Rule 40 | Calibrated P(Under 2.5) **≥ 60%** (raised from 57%) |
+| **MODEL** | Rule 40 | Calibrated P(Under 2.5) **≥ 65%** (v5.3; was 60%, before that 57%) |
 | **SAMPLE** | Rule 5 | ≥ 5 verified games per side |
 | **FAV** | Rule 19 | A heavy favourite (< 1.60) scores 3+ in ≤ 25% of recent games (a 1-0 / 2-0 side, not a 3-1 side) |
 | **NEWS** | Rule 15 (inverted) | No defender/keeper disruption on both sides, not 2+ on one side, first-choice keeper fit (FPL) |

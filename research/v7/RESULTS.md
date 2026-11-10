@@ -104,3 +104,65 @@ families (which then came back). Looser settings (z 2) fired 41-56 times for no 
 Limits, stated: the 1X2-only leagues were replayed without an Over/Under price (the solve uses a prior
 total), so their picks there were mostly double chance and team to score; live they have totals prices too.
 Per-league samples are small, which is why leagues were judged in groups and the guard watches each one.
+
+## 5. The methodologies at real prices, and the slip to lead with (`method_study.js`)
+
+v7.1. Every qualified methodology pick of the archive (41,321 settled, 20,701 with a Bet365 price) was scored at
+the Bet365 price and at the best price of the books. Held-out seasons 2023-26:
+
+| Methodology | Picks | Won | Said | Return, Bet365 | Return, best price |
+|---|---|---|---|---|---|
+| Home Win | 1,792 priced | 74.8% | 73.6% | -1.5% | +1.0% |
+| Away Win | 615 priced | 72.5% | 70.6% | -0.2% | +2.9% |
+| Double Chance | 3,213 | 76.4% | 76.0% | -3.7% | 0.0% |
+| Over 2.5 Goals | 2,950 | 65.2% | 64.6% | -2.9% | -0.7% |
+| Under 2.5 Goals (65% floor) | 283 | 68.6% | 67.3% | -3.0% | -0.5% |
+| Draw | 245 | 31.4% | 32.3% | -4.6% | -0.1% |
+| BTTS Yes | 1,412 | 63.0% | 62.1% | not quoted in the archive | |
+| BTTS No | 125 | 59.2% | 60.2% | | |
+| Team Total Goals (Over 1.5) | 1,887 | 69.2% | 68.4% | | |
+| Underdog +handicap | 3,630 | 73.6% | 72.4% | | |
+| Favourite -handicap | 721 | 70.7% | 67.5% | | |
+| Final score | 414 | 17.9% | 15.0% | | |
+
+(GG/NG 2+ stays paper-only.) Every methodology wins about what it says. What a single bookmaker's margin leaves
+is a return between about zero and -5%; at the best price of the books it is about zero. Nothing here is a
+money machine, and nothing is broken, with one exception:
+
+**Under 2.5 Goals at 60-65%.** With the old 60% floor the methodology won 61.3% of 1,384 held-out picks where it
+said 63.3%, and returned -8.0% at Bet365 (-5.8% at the best price). From 65% it wins what it says: 68.6% of 283
+held-out (said 67.3%), 67.6% of 512 in the tuning seasons (said 67.0%). The floor is now 65% (methodology v5.3).
+The floor was chosen after the held-out seasons had been seen, so this is a repair, not an out-of-sample result;
+the live record will say whether it holds. The headline pick moved from 71.9% to 72.6% won, and from -3.5% to
+-2.7% at Bet365.
+
+One watch item, no change: the Bronze tier (picks at 50-60%) won 57.0% of 1,735 held-out picks where it said
+58.3%, and the priced ones among them 55.9% of 605 (said 59.0%). In the tuning seasons the tier won 59.9% of
+2,063, so the two periods disagree and the gap is within noise (1.1 to 1.6 standard errors). The tiers page shows
+the tier's own record.
+
+### Which slip should lead?
+
+The safe slip pays about 1.3 and a single strongest pick about 1.08; the request was for odds worth staking
+without throwing the chance away. Slips of the day's methodology picks, one per match, held-out 2023-26:
+
+| Slip | Days | Landed | Said | Odds, Bet365 / best | Return, Bet365 / best |
+|---|---|---|---|---|---|
+| Two most likely methodology picks | 598 | 59.9% | 58.8% | 1.61 / 1.71 | -5.8% / +0.4% |
+| **Double-confirmed double** | 596 | **67.3%** | 63.7% | fair 1.57 | +2.1% / +8.2% (270 priced days) |
+| Three most likely methodology picks | 539 | 46.2% | 44.4% | 2.08 / 2.29 | -8.8% / +0.5% |
+| **Double-confirmed treble** | 526 | **51.5%** | 49.7% | fair 2.01 | -1.3% / +8.0% (159 priced days) |
+| Double-confirmed four-fold | 459 | 39.2% | 38.4% | fair 2.60 | -10.5% / +0.4% (82 priced days) |
+| Two best by value (chance x odds) | 569 | 41.7% | 42.8% | 2.65 / 2.81 | -8.2% / -3.1% |
+
+Double-confirmed = the pick passes a methodology and the normal prediction backs the same pick. Its legs won
+72.5%; methodology picks the normal prediction disagreed with won 66.6%. The tuning seasons are a little lower
+on the landing rates (double 64.6%, treble 48.6%) and on the return (double -0.7% at Bet365, +6.1% at the best
+price).
+
+So Today now leads with the **double-confirmed double** and lets the reader choose along the whole ladder (safe
+slip, double, treble, 2.0+ and 3.0+ banker slips), each with its chance and its measured landing rate. Read the
+returns with care: they rest on a few hundred fully priced days, so their standard error is 4 to 5 points, and
++2% and -1% both read as "about zero". The landing rates are solid; the returns say "about break-even at one
+bookmaker, a little better at the best price", not "profit". Chasing value picks instead of likely ones made
+slips worse, not better. That is why every ticket carries the lowest odds worth taking and an odds check.
