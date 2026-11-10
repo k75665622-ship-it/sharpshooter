@@ -257,7 +257,7 @@
       return `<section class="td-block">
         <h3>How the last days went</h3>
         <p class="td-note">No settled picks yet. Every pick and every slip is written down before kick-off and marked won or lost afterwards; the list fills from today.
-        ${saved ? 'The record is saved every ten minutes, so a restart of the server does not lose it.' : ''}</p>
+        ${saved ? 'The record is saved automatically through the day, so a restart of the server does not wipe it.' : ''}</p>
       </section>`;
     }
     const cur = rec.current && rec.current.n ? rec.current : rec.picks || {};

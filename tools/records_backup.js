@@ -5,7 +5,7 @@
  *
  *   node tools/records_backup.js --site https://your-site.onrender.com --dir records-branch/records
  *
- * Run by .github/workflows/records.yml every ten minutes. It asks the site for its mirrored
+ * Run by .github/workflows/records.yml through the day. It asks the site for its mirrored
  * records (GET /api/records/export), MERGES them into the files already saved (the earlier
  * recording of an entry is kept, a settled copy replaces an unsettled one — lib/persist.js merge),
  * and writes an index. Merging matters: after the host wipes its disk the site knows only what
