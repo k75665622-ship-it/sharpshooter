@@ -58,7 +58,7 @@ const out = {
   dataset: 'Club Football Match Data 2000-2025 (football-data.co.uk results + Bet365 / best-of-17 odds + ClubElo), 18 European divisions',
   heldOut: 'seasons 2023-24 to 2026-27 (not used to fit any v5 parameter)',
   fixtures: G.length,
-  rule: `v${CORE.CFG.qualify === 0.7 ? '5.2' : '5.0'}: every hard gate, then ${Math.round(CORE.CFG.qualify * 100)}% of the checklist (draw and correct score 85%); no team-under candidates`,
+  rule: `v${CORE.CFG.qualify === 0.7 ? '5.3' : '5.0'}: every hard gate, then ${Math.round(CORE.CFG.qualify * 100)}% of the checklist (draw and correct score 85%); no team unders; Under 2.5 needs 65%`,
   headline: { v5: agg(v5.rows.filter((r) => HOLD(r) && r.headline)), v4: v4 ? agg(v4.rows.filter((r) => HOLD(r) && r.headline)) : (prev.headline && prev.headline.v4) || null },
   general: {
     bestBet: agg(G.filter((g) => g.key).map((g) => ({ ...g, prob: g.prob }))),

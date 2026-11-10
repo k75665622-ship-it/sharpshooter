@@ -338,6 +338,7 @@ global.fetch = async (input, init) => {
     t('predictions endpoint returns a general prediction for every fixture', preds.general && preds.general.length === 2, preds.error);
     t('predictions list methods with counts', Array.isArray(preds.methods) && preds.methods.length === 13);
     t('predictions carry the double-confirmed accumulator', preds.accumulator && Array.isArray(preds.accumulator.legs) && Array.isArray(preds.accumulator.options) && preds.accumulator.rules.length >= 3, JSON.stringify(preds.accumulator && { legs: preds.accumulator.legs.length, err: preds.accumulator.error }));
+    t('predictions carry what became of the last days\' slips', Array.isArray(preds.slipHistory) && preds.slipHistory.every((d) => /^\d{4}-\d{2}-\d{2}$/.test(d.day)), JSON.stringify(preds.slipHistory).slice(0, 200));
     t('every accumulator leg passed a methodology AND the normal prediction', (preds.accumulator.legs || []).every((l) => ['LOCK', 'PREDICT'].includes(l.methodology.status) && ['main', 'call', 'safer'].includes(l.agreement)));
     const acc = (await get(`/api/accumulator?date=${day}`)).body;
     t('accumulator endpoint', acc.accumulator && Array.isArray(acc.accumulator.options), JSON.stringify(acc).slice(0, 200));
@@ -419,7 +420,7 @@ global.fetch = async (input, init) => {
     t('bet builder: track record CSV, legs included', typeof bbCsv.body === 'string' && bbCsv.body.startsWith('date,league,home,away,size') && bbCsv.body.split('\n').length >= 1 + bb.builders.length && / \| /.test(bbCsv.body), String(bbCsv.body).slice(0, 200));
 
     const meth = (await get('/api/methodology')).body;
-    t('methodology endpoint is v5.1 with backtest numbers and the tiers', meth.version === '5.1' && meth.config.qualify === 0.7 && meth.backtest && meth.backtest.headline && meth.backtest.headline.v5.n > 1000 && meth.tiers.length === 5);
+    t('methodology endpoint is v5.3 with backtest numbers and the tiers', meth.version === '5.3' && meth.config.qualify === 0.7 && meth.backtest && meth.backtest.headline && meth.backtest.headline.v5.n > 1000 && meth.tiers.length === 5);
 
     const led = (await get('/api/ledger')).body;
     t('ledger recorded the pre-match predictions', led.entries >= 2, JSON.stringify(led).slice(0, 200));
@@ -470,13 +471,53 @@ global.fetch = async (input, init) => {
       w.scrollTo = () => {};
       w.eval(`setDate(${JSON.stringify(day)})`);
       await settle(2500);
-      // the site opens on Today: the safe slip ticket (or why there is none), the banker of the day, the day's picks
+      // the site opens on Today: one ticket for the chosen slip, the methodology picks, the day's strongest picks
       const home = w.document.querySelector('#board').textContent;
       const D0 = w.document;
-      t('the site opens on Today', w.eval('state.view') === 'today' && D0.querySelector('.section.is-active').dataset.section === 'today' && /safest bets|No safe slip|Safe slip/.test(home), home.replace(/\s+/g, ' ').slice(0, 200));
-      t('Today shows the slip ticket and the banker of the day', D0.querySelectorAll('.ticket').length === 1 && (D0.querySelectorAll('.td-banker').length === 1) === (w.eval('(window.__sp = null, 1)') && /Banker of the day/.test(home)), home.replace(/\s+/g, ' ').slice(0, 300));
+      t('the site opens on Today', w.eval('state.view') === 'today' && D0.querySelector('.section.is-active').dataset.section === 'today' && D0.querySelectorAll('.td-head h1').length === 1, home.replace(/\s+/g, ' ').slice(0, 200));
+      t('Today shows one slip ticket and the methodology picks', D0.querySelectorAll('.ticket').length === 1 && /Methodology picks/.test(home) && !/Banker of the day/.test(home), home.replace(/\s+/g, ' ').slice(0, 300));
       t('Today explains the record and the live guard', /How the last days went/.test(home) && /Live guard/.test(home), home.replace(/\s+/g, ' ').slice(-400));
       t('five sections, the views of the open one only', D0.querySelectorAll('.section').length === 5 && [...D0.querySelectorAll('.tab')].filter((b) => !b.hidden).map((b) => b.dataset.view).join(',') === 'today');
+      {
+        // a day with every kind of slip (the two test fixtures give few): the page's own choosing
+        const real = w.eval('state.preds');
+        w.__real = real;
+        const ko = new Date(Date.now() + 6 * 3600e3).toISOString();
+        const leg = (id, home2, away2, label, prob, best, name) => ({ fixtureId: id, league: 'eng.1', kickoff: ko, home: home2, away: away2, label, prob, best, takeAt: Math.max(1.05, 1.02 / prob), fair: 1 / prob, agreement: 'main', methodology: { id: 'x', name, status: 'PREDICT', prob } });
+        const L = [leg('9001', 'Arsenal', 'Leeds', 'Arsenal to win', 0.82, 1.25, 'Home Win'), leg('9002', 'Sunderland', 'Everton', 'Over 1.5 goals', 0.8, 1.27, 'Over 1.5 Goals'), leg('9003', 'Ajax', 'Twente', 'Ajax or Draw', 0.78, 1.3, 'Double Chance')];
+        const opt = (k, hit, n) => { const pk = L.slice(0, k); const prob = pk.reduce((a, l) => a * l.prob, 1); return { size: k, name: k === 2 ? 'Double' : 'Treble', legs: pk, prob, fairOdds: 1 / prob, bestOdds: pk.reduce((a, l) => a * l.best, 1), takeAt: pk.reduce((a, l) => a * l.takeAt, 1), measured: { hit, n, roiBest: 0.08 } }; };
+        const bleg = (home2, away2, label, prob, odds) => ({ kickoff: ko, home: home2, away: away2, label, prob, odds });
+        const bslip = (legs2, target) => { const prob = legs2.reduce((a, l) => a * l.prob, 1); return { target, legs: legs2, size: legs2.length, prob, odds: legs2.reduce((a, l) => a * l.odds, 1), fairOdds: 1 / prob, estimated: false }; };
+        const B = [bleg('Arsenal', 'Leeds', 'Arsenal to win', 0.82, 1.25), bleg('Sunderland', 'Everton', 'Over 1.5 goals', 0.8, 1.27), bleg('Ajax', 'Twente', 'Ajax or Draw', 0.78, 1.3), bleg('Porto', 'Braga', 'Under 3.5 goals', 0.77, 1.3), bleg('Lyon', 'Nice', 'Lyon or Draw', 0.76, 1.32)];
+        w.__fake = { ...real,
+          accumulator: { legs: L, options: [opt(2, 0.6728, 596), opt(3, 0.5152, 526)], rules: [] },
+          banker: { target: 3, slip: bslip(B, 3), safer: bslip(B.slice(0, 3), 2), bankers: [], record: { heldOut: { slip: { hit: 0.336, slips: 547 }, safer: { hit: 0.489, slips: 650 } } } },
+          slipHistory: [{ day: '2026-01-02', double: 'won', treble: 'lost', banker2: 'won', banker3: 'lost' }],
+        };
+        w.eval("try { localStorage.removeItem('ss-slip'); } catch (e) {} state.preds = window.__fake; window.renderToday();");
+        await settle(60);
+        const rungs = () => [...D0.querySelectorAll('.td-rung')];
+        const ids = rungs().map((r) => r.dataset.slip);
+        t('Today offers every slip of the day, safest first', ['mdouble', 'mtreble', 'banker2', 'banker3'].every((id) => ids.includes(id)) && ids.indexOf('mdouble') < ids.indexOf('mtreble') && ids.indexOf('mtreble') < ids.indexOf('banker3'), ids.join(','));
+        const tk = () => D0.querySelector('.ticket');
+        t('the methodology double is the slip shown first', /Methodology double/.test(tk().querySelector('h2').textContent) && tk().querySelectorAll('.ticket-legs li').length === 2 && D0.querySelector('.td-rung.is-on').dataset.slip === 'mdouble' && /Best odds seen/.test(tk().textContent) && /1\.59/.test(tk().textContent) && /67%/.test(tk().textContent), tk().textContent.replace(/\s+/g, ' ').slice(0, 300));
+        t('the ticket names the methodology behind each leg', /Home Win/.test(tk().textContent) && /Over 1\.5 Goals/.test(tk().textContent));
+        // the odds check: the bookmaker's price against the lowest worth taking
+        const typeOdds = (v) => { const inp = D0.querySelector('#tdOdds'); inp.value = v; inp.dispatchEvent(new w.Event('input', { bubbles: true })); return D0.querySelector('#tdVerdict').textContent; };
+        const takeAt = L[0].takeAt * L[1].takeAt;
+        t('odds check: a price at or above the bar is good, one far below is refused', /Good price/.test(typeOdds((takeAt + 0.05).toFixed(2))) && /Too low/.test(typeOdds('1.20')) && /Fair, but only just/.test(typeOdds('1.53')) && typeOdds('') === '', `${takeAt.toFixed(3)} · ${typeOdds('1.53')}`);
+        rungs().find((r) => r.dataset.slip === 'banker3').click();
+        await settle(30);
+        t('choosing another slip changes the ticket and is remembered', /3\.0\+ banker slip/.test(tk().querySelector('h2').textContent) && tk().querySelectorAll('.ticket-legs li').length === 5 && D0.querySelector('.td-rung.is-on').dataset.slip === 'banker3' && w.localStorage.getItem('ss-slip') === 'banker3', tk().textContent.replace(/\s+/g, ' ').slice(0, 200));
+        const board2 = D0.querySelector('#board').textContent;
+        t('Today lists the methodology picks, double-confirmed ones marked', D0.querySelectorAll('.td-tag').length === 3 && /Ajax or Draw/.test(board2) && /Double Chance/.test(board2) && /double-confirmed/.test(board2) && /All methodology picks/.test(board2));
+        t('the last days show what became of the methodology slips', /methodology double won/.test(board2) && /treble lost/.test(board2) && /2\.0 slip won/.test(board2), board2.replace(/\s+/g, ' ').slice(-600, -200));
+        D0.querySelector('[data-view="predictions"].btn').click();
+        await settle(30);
+        t('"All methodology picks" opens the methodology picks tab', w.eval('state.view') === 'predictions' && D0.querySelector('.section.is-active').dataset.section === 'picks' && [...D0.querySelectorAll('.tab')].filter((b) => !b.hidden).map((b) => b.dataset.view).join(',') === 'strongest,predictions,tiers,top' && [...D0.querySelectorAll('.tab')].filter((b) => !b.hidden).map((b) => b.textContent.trim()).join('|') === 'Strongest picks|Methodology picks|Methodology tiers|Top pick', [...D0.querySelectorAll('.tab')].filter((b) => !b.hidden).map((b) => b.textContent.trim()).join('|'));
+        w.eval("try { localStorage.removeItem('ss-slip'); } catch (e) {} state.preds = window.__real; window.__real = null; window.__fake = null; setView('today');");
+        await settle(60);
+      }
       w.eval("setView('matches')");
       await settle(1500);
       t('a section shows its own views', [...D0.querySelectorAll('.tab')].filter((b) => !b.hidden).map((b) => b.dataset.view).join(',') === 'matches,general' && D0.querySelector('.section.is-active').dataset.section === 'matches');

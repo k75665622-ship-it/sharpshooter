@@ -1,6 +1,6 @@
 {
   "name": "sharpshooter",
-  "version": "7.0.0",
+  "version": "7.1.0",
   "private": true,
   "description": "Football picks with measured chances: a price-anchored engine with 170 measured factors, Strongest Picks in 34 measured leagues with a live guard, safe slips, thirteen market methodologies, and a track record that keeps itself.",
   "main": "server.js",

@@ -771,7 +771,15 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/predictions') {
       const dateYmd = normaliseDate(url.searchParams.get('date'));
       const limit = Number(url.searchParams.get('limit')) || 60;
-      return json(res, 200, await predictionsFor(dateYmd, limit, { refresh: url.searchParams.get('refresh') === '1' }));
+      const out = await predictionsFor(dateYmd, limit, { refresh: url.searchParams.get('refresh') === '1' });
+      // how the published slips of the last days ended (the ledger), for the Today page
+      let slipHistory = [];
+      try {
+        slipHistory = LEDGER.slipHistory(14);
+      } catch {
+        slipHistory = [];
+      }
+      return json(res, 200, { ...out, slipHistory });
     }
 
     if (p === '/api/daybook') {
@@ -794,7 +802,7 @@ const server = http.createServer(async (req, res) => {
 
     if (p === '/api/methodology') {
       return json(res, 200, {
-        version: '5.1',
+        version: '5.3',
         config: MI.core.CFG,
         tiers: BACKTEST.tiers || [],
         methods: MI.SPECS.map((s) => ({

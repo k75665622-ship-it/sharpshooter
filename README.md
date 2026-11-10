@@ -20,6 +20,28 @@ See [`methodology/GENERAL-PREDICTION-v6.md`](methodology/GENERAL-PREDICTION-v6.m
 
 ---
 
+## What's new in v7.1 — the methodology on the first screen, and a slip you choose
+
+- **Today leads with the methodology.** The first ticket is the **methodology double**: two picks that pass one of
+  the thirteen methodologies **and** that the normal prediction backs (double-confirmed). Below it, the day's
+  **methodology picks** with the methodology each one passed and its best price.
+- **Choose your slip, from the safest to the biggest odds.** One ticket, five slips: the safe slip (about 1.3), the
+  methodology double (about 1.5), the methodology treble (about 1.9), the 2.0+ banker slip and the 3.0+ High Banker.
+  Each shows its chance, its odds and how often slips built that way landed on past matches; the choice is
+  remembered. Held-out 2023-26: the double landed **67.3%** of 596 days, the treble **51.5%** of 526.
+- **An odds check.** Every ticket names the lowest odds worth taking. Type your bookmaker's odds for the slip and it
+  says *good price*, *fair, but only just* or *too low, skip it*.
+- **Under 2.5 Goals needs 65%** (was 60%). With the 60% floor the methodology won 61.3% of its 2023-26 picks where
+  it said 63.3%, and returned -8.0% at Bet365; the losses sat between 60% and 65%. From 65% it wins what it says
+  (68.6% of 283, tuning seasons 67.6% of 512). The other twelve methodologies were re-measured at real prices and
+  win what they say, so they are unchanged.
+- **Tabs named for what they are**: Methodology picks, Methodology tiers, Methodology slips, Methodology rules.
+- **The last days' list** now also shows what became of each day's methodology double, treble and banker slips.
+
+Measured, and worth knowing before staking: bigger odds always mean a smaller chance (a 3.0 slip landed 1 day in 3),
+and at a single bookmaker's prices every slip here is close to break-even, not a money machine. Details:
+[research/v7/RESULTS.md](research/v7/RESULTS.md) section 5.
+
 ## What's new in v7
 
 - **A new site, built for the phone.** It opens on **Today**: the day's safe slip drawn as a ticket (stamped won or
