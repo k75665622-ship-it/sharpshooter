@@ -62,11 +62,11 @@
 .ticket-foot > div b small { font-family: var(--sans); font-weight: 500; font-size: 12px; color: var(--text-3); }
 .ticket-foot .btn { margin-left: auto; }
 
-/* the stamp on a settled slip */
+/* the stamp on a settled slip: on the stub, beside the figures */
 .stamp {
-  position: absolute; top: 12px; right: 118px; z-index: 1; transform: rotate(-9deg);
-  font-family: var(--display); font-weight: 700; font-size: 26px; line-height: 1; letter-spacing: .04em;
-  padding: 5px 12px 4px; border: 3px solid currentColor; border-radius: 8px; background: var(--surface);
+  margin-left: auto; transform: rotate(-7deg);
+  font-family: var(--display); font-weight: 700; font-size: 28px; line-height: 1; letter-spacing: .04em;
+  padding: 5px 13px 4px; border: 3px solid currentColor; border-radius: 8px;
 }
 .stamp.won { color: var(--green); }
 .stamp.lost { color: var(--red); }
@@ -152,7 +152,7 @@
   .ticket-chance b { font-size: 44px; }
   .ticket-legs { padding: 0 14px; }
   .ticket-foot { padding: 12px 14px 14px; gap: 14px; }
-  .stamp { right: 96px; font-size: 22px; }
+  .stamp { font-size: 24px; }
   .td-day { grid-template-columns: 84px minmax(0, 1fr) auto; }
   .td-rung { grid-template-columns: minmax(0, 1.3fr) minmax(30px, .7fr) auto; gap: 8px; }
 }

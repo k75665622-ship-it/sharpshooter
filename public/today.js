@@ -84,7 +84,6 @@
       </li>`).join('');
     const state_ = started ? (sl.hit === 1 ? 'won' : sl.hit === 0 ? 'lost' : 'live') : 'open';
     return `<section class="ticket is-${state_}" aria-label="Safe slip">
-      ${stamp(sl.hit, sl.result)}
       <header class="ticket-head">
         <div><h2>Safe slip</h2>
           <p>${started ? 'Published before the first kick-off and kept as it was.' : `The ${sl.legs.length} strongest picks of the day on one slip.`}</p></div>
@@ -94,7 +93,7 @@
       <footer class="ticket-foot">
         <div><span>Fair odds</span><b>${dec(sl.fairOdds)}</b></div>
         ${meas && meas.n ? `<div><span>Slips like this landed</span><b>${pct(meas.landed, 0)} <small>of ${meas.n.toLocaleString('en-GB')} days</small></b></div>` : ''}
-        ${started ? '' : '<button class="btn" id="tdCopy">Copy slip</button>'}
+        ${started ? stamp(sl.hit, sl.result) : '<button class="btn" id="tdCopy">Copy slip</button>'}
       </footer>
     </section>`;
   }
