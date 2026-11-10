@@ -374,6 +374,21 @@ global.fetch = async (input, init) => {
     t('strongest: no team under, clean sheet or BTTS No on the list or the match cards', sp.picks.every((p) => !sp.config.excluded.includes(p.pick.key)) && sp.matches.every((m) => m.cards.every((c) => c.none || !sp.config.excluded.includes(c.key))));
     t('strongest: the slips\' measured record is published', sp.config.measured && sp.config.measured.slips && sp.config.measured.slips.safe.landed > 0.7 && sp.config.measured.slips.bySize['10'].landed < 0.5);
     t('strongest: the record says whether it survives a restart', sp.record && sp.record.persist && sp.record.persist.enabled === false);
+    t('strongest: the live guard reports what it checked', sp.guard && Array.isArray(sp.guard.suspended) && Array.isArray(sp.guard.watch) && sp.guard.checked >= 0, JSON.stringify(sp.guard));
+    t('strongest: 34 measured leagues, Brazil and Argentina named as failed', sp.config.testedLeagues.length === 34 && sp.config.testedLeagues.includes('usa.1') && sp.config.failedLeagues.includes('bra.1') && !sp.config.testedLeagues.includes('arg.1'));
+    t('strongest: the record lists the last days', sp.record && Array.isArray(sp.record.daily));
+    const exp = (await get('/api/records/export')).body;
+    t('records export for the scheduled backup: the picks, never the match cards', exp && exp.files && Object.values(exp.files).every((book) => Object.values(book).every((e) => ['pick', 'slip', 'builder', 'banker', 'acca', 'headline'].includes(e.kind))) && Object.keys(exp.files).some((f) => /^strongest-\d{4}-\d{2}\.json$/.test(f)), JSON.stringify(Object.keys(exp.files || {})));
+    // what a phone downloads: compressed, and not again when nothing changed
+    const gz = await realFetch(base + `/api/strongest?date=${day}`, { headers: { 'accept-encoding': 'gzip' } });
+    t('API answers are gzipped for browsers that accept it', gz.headers.get('content-encoding') === 'gzip' && !!(await gz.json()).picks);
+    const page = await realFetch(base + '/app.js', { headers: { 'accept-encoding': 'gzip' } });
+    const etag = page.headers.get('etag');
+    await page.text();
+    const again = await realFetch(base + '/app.js', { headers: { 'if-none-match': etag } });
+    t('an unchanged file is not sent twice (ETag, 304)', page.status === 200 && page.headers.get('content-encoding') === 'gzip' && !!etag && again.status === 304);
+    const font = await realFetch(base + '/fonts/barlow-condensed-700.woff2');
+    t('the typeface is served from the site itself and kept by the browser', font.status === 200 && font.headers.get('content-type') === 'font/woff2' && /immutable/.test(font.headers.get('cache-control')) && (await font.arrayBuffer()).byteLength > 10000);
     const spRec = (await get('/api/strongest/record')).body;
     t('strongest: track record endpoint', spRec.picks && spRec.byTier && Array.isArray(spRec.recent));
     const spCsv = await get('/api/strongest/record?format=csv');
@@ -423,7 +438,7 @@ global.fetch = async (input, init) => {
     if (JSDOM) {
       const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8').replace('<script src="/app.js"></script>', '').replace('<script src="/strongest.js"></script>', '')
         .replace('<script src="/shared.js"></script>', '').replace('<script src="/daycache.js"></script>', '').replace('<script src="/banker.js"></script>', '')
-        .replace('<script src="/betbuilder-core.js"></script>', '').replace('<script src="/betbuilder.js"></script>', '').replace('<script src="/tiers.js"></script>', '');
+        .replace('<script src="/betbuilder-core.js"></script>', '').replace('<script src="/betbuilder.js"></script>', '').replace('<script src="/tiers.js"></script>', '').replace('<script src="/today.js"></script>', '');
       const errors = [];
       const dom = new JSDOM(html, { url: base + '/', runScripts: 'dangerously', pretendToBeVisual: true });
       const w = dom.window;
@@ -445,15 +460,26 @@ global.fetch = async (input, init) => {
       const sc3 = w.document.createElement('script');
       sc3.textContent = fs.readFileSync(path.join(__dirname, '..', 'public', 'banker.js'), 'utf8');
       w.document.body.appendChild(sc3);
-      for (const f of ['betbuilder-core.js', 'betbuilder.js', 'tiers.js']) {
+      for (const f of ['betbuilder-core.js', 'betbuilder.js', 'tiers.js', 'today.js']) {
         const s4 = w.document.createElement('script');
         s4.textContent = fs.readFileSync(path.join(__dirname, '..', 'public', f), 'utf8');
         w.document.body.appendChild(s4);
       }
       w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
       const settle = (ms) => new Promise((r) => setTimeout(r, ms));
+      w.scrollTo = () => {};
       w.eval(`setDate(${JSON.stringify(day)})`);
+      await settle(2500);
+      // the site opens on Today: the safe slip ticket (or why there is none), the banker of the day, the day's picks
+      const home = w.document.querySelector('#board').textContent;
+      const D0 = w.document;
+      t('the site opens on Today', w.eval('state.view') === 'today' && D0.querySelector('.section.is-active').dataset.section === 'today' && /safest bets|No safe slip|Safe slip/.test(home), home.replace(/\s+/g, ' ').slice(0, 200));
+      t('Today shows the slip ticket and the banker of the day', D0.querySelectorAll('.ticket').length === 1 && (D0.querySelectorAll('.td-banker').length === 1) === (w.eval('(window.__sp = null, 1)') && /Banker of the day/.test(home)), home.replace(/\s+/g, ' ').slice(0, 300));
+      t('Today explains the record and the live guard', /How the last days went/.test(home) && /Live guard/.test(home), home.replace(/\s+/g, ' ').slice(-400));
+      t('five sections, the views of the open one only', D0.querySelectorAll('.section').length === 5 && [...D0.querySelectorAll('.tab')].filter((b) => !b.hidden).map((b) => b.dataset.view).join(',') === 'today');
+      w.eval("setView('matches')");
       await settle(1500);
+      t('a section shows its own views', [...D0.querySelectorAll('.tab')].filter((b) => !b.hidden).map((b) => b.dataset.view).join(',') === 'matches,general' && D0.querySelector('.section.is-active').dataset.section === 'matches');
       const board = w.document.querySelector('#board').textContent;
       t('Matches tab lists the fixtures', /Arsenal/.test(board) && /Sunderland/.test(board), board.slice(0, 200));
       t('Matches tab shows predicted score chips', w.document.querySelectorAll('.sc-chip').length === 2);
@@ -466,7 +492,7 @@ global.fetch = async (input, init) => {
           t('High Banker tab leads with the safest slip and says how often a 3.0 slip lands', /Safest slip today/.test(txt) && /Read this first/.test(txt) && /1 day in \d/.test(txt), [/Safest slip today/.test(txt), /Read this first/.test(txt), /1 day in \d/.test(txt)].join() + ' ' + txt.replace(/\s+/g, ' ').slice(0, 400));
         }
         if (view === 'strongest') {
-          t('Strongest Picks tab shows the picks and the nine-market cards', /The picks every view agrees on/.test(txt) && w.document.querySelectorAll('.sp-mc').length === 2 && w.document.querySelectorAll('.sp-row').length === 18, txt.slice(0, 200));
+          t('Strongest Picks tab shows the picks and the nine-market cards', /The strongest pick of each match/.test(txt) && w.document.querySelectorAll('.sp-mc').length === 2 && w.document.querySelectorAll('.sp-row').length === 18, txt.slice(0, 200));
           w.document.querySelector('[data-group="Corners"]').click();
           await settle(50);
           t('Strongest Picks market filter shows one row per match', w.document.querySelectorAll('.sp-row').length === 2);

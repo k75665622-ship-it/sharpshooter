@@ -14,14 +14,14 @@
 /* the tab: a small gem */
 .tab.tr-tab { display: inline-flex; align-items: center; gap: 6px; }
 .tab.tr-tab::before { content: ''; width: 8px; height: 8px; transform: rotate(45deg); background: linear-gradient(135deg, #67e8f9, var(--tr-diamond)); flex: 0 0 auto; border-radius: 1px; }
-.tab.tr-tab.is-active::before { background: #fff; }
+.tab.tr-tab.is-active::before { background: var(--on-ink); }
 
 /* ---- intro ---- */
-.tr-intro .tr-kicker { font-size: 11px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: var(--tr-diamond); margin-bottom: 4px; }
+.tr-intro .tr-kicker { font-size: 12px; font-weight: 700; color: var(--tr-diamond); margin-bottom: 4px; }
 .tr-intro h2 { text-wrap: balance; }
 .tr-intro p { max-width: 80ch; }
 .tr-intro p.tr-cov { margin: 0; font-size: 12.5px; color: var(--text-2); }
-.tr-intro p.tr-cov.is-busy { color: #7a4708; }
+.tr-intro p.tr-cov.is-busy { color: var(--amber); }
 .tr-filters { margin-bottom: 12px; }
 .tr-empty { background: var(--surface); border: 1px dashed var(--border-strong); border-radius: var(--radius); padding: 14px 16px; margin: 0 0 12px; color: var(--text-2); font-size: 13px; }
 
@@ -54,7 +54,7 @@
 .tr-rec { font-size: 12px; color: var(--text-2); white-space: nowrap; }
 .tr-rec b { color: var(--text); }
 .tr-count { display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
-.tr-count b { font-family: var(--mono); font-size: 20px; font-weight: 800; line-height: 1.1; color: var(--text); font-variant-numeric: tabular-nums; }
+.tr-count b { font-family: var(--display); font-size: 20px; font-weight: 700; line-height: 1.1; color: var(--text); font-variant-numeric: tabular-nums; }
 .tr-count small { font-size: 11px; color: var(--text-3); white-space: nowrap; }
 .tr-chev { width: 10px; height: 10px; border-right: 2px solid var(--text-3); border-bottom: 2px solid var(--text-3); transform: rotate(45deg) translate(-2px, -2px); transition: transform .15s ease; justify-self: center; }
 .tr-tier.is-open .tr-chev { transform: rotate(225deg) translate(-2px, -2px); }
@@ -64,7 +64,7 @@
 .tr-note { font-size: 12.5px; color: var(--text-2); margin: 10px 0 4px; line-height: 1.55; max-width: 90ch; }
 .tr-none { font-size: 13px; color: var(--text-3); margin: 12px 0 2px; }
 .tr-group { margin-top: 12px; }
-.tr-gh { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--text-3); margin-bottom: 6px; }
+.tr-gh { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; color: var(--text-3); margin-bottom: 6px; }
 .tr-gh .pill { margin-left: 0; background: var(--cs); color: var(--c); }
 .tr-rows { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
 .tr-row {

@@ -189,12 +189,11 @@
     const h = b.record && b.record.heldOut;
     const oneIn = h && h.slip && h.slip.hit > 0 ? Math.round(1 / h.slip.hit) : 3;
     el.innerHTML = `<div class="m-intro bk-intro">
-        <div class="bk-kicker">High Banker · ${esc(fmtDateLong(d.date || state.date))}</div>
-        <h2>Today's bankers — start with the safest slip</h2>
-        <div class="meas-note"><b>Read this first.</b> Odds tell the truth about the chance: a ${dec(target, 1)}-odds slip cannot land more than about
-        1 time in ${Math.round(target)}, however strong its legs. On the seasons the rule never saw, the ${dec(target, 1)}+ High Banker landed
-        ${h && h.slip ? `<b>${pct(h.slip.hit, 1)}</b>` : 'about a third'} of the time — roughly 1 day in ${oneIn} — and the safer ${dec(cfg.safer || 2, 1)}+ slip
-        ${h && h.safer ? `<b>${pct(h.safer.hit, 1)}</b>` : 'about half'}. If you want to win most days, play the <b>safest slip</b> below: short odds, but it lands far more often.</div>
+        <div class="bk-kicker">${esc(fmtDateLong(d.date || state.date))}</div>
+        <h2>Banker slips: start with the safest</h2>
+        <div class="meas-note"><b>Read this first.</b> Odds tell the truth about the chance. A ${dec(target, 1)}-odds slip lands about 1 day in ${oneIn}
+        however strong its legs (${h && h.slip ? `<b>${pct(h.slip.hit, 1)}</b>` : 'about a third'} on the seasons the rule never saw), and a ${dec(cfg.safer || 2, 1)}-odds slip
+        about 1 day in 2 (${h && h.safer ? `<b>${pct(h.safer.hit, 1)}</b>` : 'about half'}). To win most days, play the <b>safest slip</b> below: short odds, but it lands far more often.</div>
         ${safeBlock()}
         <div class="sec-title bk-sec">The ${dec(target, 1)}+ High Banker</div>
         <p>Only selections that pass <b>every one of seven checks</b> are bankers: the model and the bookmakers' own price both rate it at least

@@ -46,8 +46,17 @@ if (ONLY || MODELS) for (const k of Object.keys(RULES)) if (k !== (ONLY || 'site
 const TARGETS = [...new Set([0.85, 0.8, SC.safeSlipChance, 0.7, SC.longSlipChance, 0.6, 0.5])].sort((a, b) => b - a);
 const tierOf = (p) => (SC.tiers.find((t) => p >= t.min - 1e-9) || { name: 'below' }).name;
 
+// --models measures the site as it is configured: only the leagues it gives picks in
+const FDS = require('../../lib/crawler/sources/footballdata');
+const TESTED = MODELS && SC.testedLeaguesOnly ? new Set(SC.testedLeagues.map((slug) => (FDS.LEAGUES[slug] || {}).div).filter(Boolean)) : null;
 const rows = [];
-for (const line of fs.readFileSync(file, 'utf8').split('\n')) if (line) rows.push(JSON.parse(line));
+for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+  if (!line) continue;
+  const r = JSON.parse(line);
+  if (TESTED && !TESTED.has(r.div)) continue;
+  rows.push(r);
+}
+if (TESTED) console.log(`${rows.length} matches in the ${TESTED.size} divisions the site gives picks in`);
 
 function pickOf(r, rule) {
   let best = null;
@@ -201,6 +210,7 @@ if (MODELS) {
   for (const r of rows) if (r.d > last) last = r.d;
   const models = JSON.parse(fs.readFileSync(MODELS, 'utf8'));
   models.measured = {
+    leagues: TESTED ? TESTED.size : null,
     rule: `v${SC.version}: ${Math.round(SC.minChance * 100)}% measured chance (${Math.round(SC.minChanceStatsOnly * 100)}% corners and bookings), every view ${Math.round(SC.floor * 100)}%+, bookmakers at most ${Math.round(SC.maxProb * 100)}%, ${SC.excluded.length} weak markets kept off`,
     method: 'price-anchored replay (research/v6/slips_study.js): the bookmaker-anchored and possession views; the v6 factor and stats views and the trap checks cannot be rebuilt on the archive, so the site adds checks the replay does not',
     window: `Jul 2023 – ${new Date(last + 'T00:00:00Z').toLocaleString('en-GB', { month: 'short', year: 'numeric', timeZone: 'UTC' })}`,

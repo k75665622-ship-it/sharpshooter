@@ -11,9 +11,20 @@ if (!window.DayCache) window.DayCache = { init: async () => null, onNewDay() {},
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
+// The five sections and the views inside each (public/index.html: .section and .tab).
+const SECTIONS = {
+  today: ['today'],
+  picks: ['strongest', 'tiers', 'top', 'predictions'],
+  slips: ['banker', 'betbuilder', 'acca'],
+  matches: ['matches', 'general'],
+  more: ['record', 'method'],
+};
+const sectionOf = (view) => Object.keys(SECTIONS).find((k) => SECTIONS[k].includes(view)) || 'today';
+const lastView = {}; // the view last opened in each section
+
 const state = {
   date: null,          // 'YYYY-MM-DD'
-  view: 'matches',
+  view: 'today',
   board: null,
   analysis: null,      // current match report
   selectedId: null,
@@ -992,6 +1003,7 @@ function predStatus(d) {
 }
 
 function rerenderViews() {
+  if (state.view === 'today') { if (window.renderToday) window.renderToday(); return; }
   if (state.view === 'matches') renderBoard();
   else if (['predictions', 'top', 'general', 'acca', 'banker', 'tiers'].includes(state.view)) renderPredView();
 }
@@ -1475,6 +1487,7 @@ function renderPredView() {
 }
 
 async function refresh() {
+  if (state.view === 'today') return window.renderToday && window.renderToday(true);
   if (state.view === 'strongest') return window.renderStrongest && window.renderStrongest(true);
   if (state.view === 'betbuilder') return window.renderBetBuilder && window.renderBetBuilder(true);
   if (state.view === 'method') return renderMethod();
@@ -1517,12 +1530,30 @@ function revealTab() {
 }
 
 function setView(view) {
+  if (!sectionOf(view) || !Object.values(SECTIONS).some((l) => l.includes(view))) view = 'today';
   state.view = view;
-  $$('.tab').forEach((t) => t.classList.toggle('is-active', t.dataset.view === view));
+  const section = sectionOf(view);
+  lastView[section] = view;
+  $$('.section').forEach((b) => {
+    const on = b.dataset.section === section;
+    b.classList.toggle('is-active', on);
+    if (on) b.setAttribute('aria-current', 'page');
+    else b.removeAttribute('aria-current');
+  });
+  $$('.tab').forEach((t) => {
+    t.hidden = t.dataset.section !== section;
+    t.classList.toggle('is-active', t.dataset.view === view);
+  });
+  const sub = $('#subnav');
+  if (sub) sub.classList.toggle('is-single', SECTIONS[section].length < 2);
   revealTab();
   $('#bankersOnly').parentElement.style.display = view === 'matches' ? '' : 'none';
+  $('#liveRefresh').parentElement.style.display = view === 'matches' ? '' : 'none';
   $('.datebar').classList.toggle('is-muted', view === 'method' || view === 'record');
+  try { history.replaceState(null, '', '#' + view); } catch { /* file:// or a sandbox */ }
+  window.scrollTo(0, 0);
 
+  if (view === 'today') { if (window.renderToday) window.renderToday(); return; }
   if (view === 'matches') { loadBoard(); return; }
   if (view === 'method') { renderMethod(); return; }
   if (view === 'record') { renderRecord(); return; }
@@ -1551,8 +1582,7 @@ function setDate(iso) {
   $('#dateInput').value = iso;
   $('#dateLabel').textContent = fmtDateLong(iso);
   $$('.quick').forEach((q) => q.classList.toggle('is-active', shiftDate(todayISO(), Number(q.dataset.offset)) === iso));
-  if (state.view === 'matches') loadBoard();
-  else setView(state.view);
+  setView(state.view);
 }
 
 /* ---------------------------------------------------------- init */
@@ -1567,6 +1597,21 @@ function init() {
   $('#dateInput').addEventListener('change', (e) => e.target.value && setDate(e.target.value));
   $$('.quick').forEach((q) => q.addEventListener('click', () => setDate(shiftDate(todayISO(), Number(q.dataset.offset)))));
   $$('.tab').forEach((t) => t.addEventListener('click', () => setView(t.dataset.view)));
+  $$('.section').forEach((b) => b.addEventListener('click', () => setView(lastView[b.dataset.section] || SECTIONS[b.dataset.section][0])));
+  const brand = $('#brand');
+  if (brand) brand.addEventListener('click', () => { if (state.date !== todayISO()) setDate(todayISO()); setView('today'); });
+  // light / dark: the phone's setting unless one was chosen here
+  const themeBtn = $('#themeBtn');
+  if (themeBtn) {
+    themeBtn.addEventListener('click', () => {
+      const root = document.documentElement;
+      const dark = root.getAttribute('data-theme') ? root.getAttribute('data-theme') === 'dark' : !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      const next = dark ? 'light' : 'dark';
+      root.setAttribute('data-theme', next);
+      try { localStorage.setItem('ss-theme', next); } catch { /* private window */ }
+    });
+  }
+  $$('.quick').forEach((q) => q.classList.toggle('is-active', Number(q.dataset.offset) === 0));
   $('#tabs').addEventListener('scroll', tabsEdge, { passive: true });
   window.addEventListener('resize', tabsEdge);
   tabsEdge();
@@ -1599,8 +1644,10 @@ function init() {
     setStatus('new day (05:00 Ghana time) — loading today\'s fixtures…', 'busy');
     setDate(todayISO());
   });
+  // open on the view named in the address (#strongest, #banker...), otherwise Today
+  const wanted = (location.hash || '').replace('#', '');
   DayCache.init().catch(() => null).finally(() => {
-    loadBoard();
+    setView(Object.values(SECTIONS).some((l) => l.includes(wanted)) ? wanted : 'today');
     scheduleRefresh();
   });
 }
@@ -1612,7 +1659,7 @@ function scheduleRefresh() {
   refreshTimer = setInterval(() => {
     if (document.hidden || state.loadingDetail) return;
     // the board is cheap: it carries live and final scores onto the saved predictions
-    if (['matches', 'predictions', 'top', 'general', 'acca', 'banker', 'tiers'].includes(state.view)) loadBoard();
+    if (['matches', 'predictions', 'top', 'general', 'acca', 'banker', 'tiers', 'today'].includes(state.view)) loadBoard();
   }, 60000);
 }
 

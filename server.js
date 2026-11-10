@@ -33,6 +33,7 @@
  */
 
 const http = require('http');
+const zlib = require('zlib');
 const fs = require('fs');
 const path = require('path');
 
@@ -74,14 +75,33 @@ const PUBLIC = path.join(__dirname, 'public');
 
 // ---------------------------------------------------------------- helpers
 
+/**
+ * Send a body, gzipped when the browser accepts it and it is worth it. A day's predictions are
+ * one to three megabytes of JSON: about a tenth of that over a phone's connection.
+ */
+function send(res, code, headers, body) {
+  const buf = Buffer.isBuffer(body) ? body : Buffer.from(String(body));
+  const accepts = /\bgzip\b/.test(String((res.req && res.req.headers && res.req.headers['accept-encoding']) || ''));
+  if (!accepts || buf.length < 1024) {
+    res.writeHead(code, headers);
+    return res.end(buf);
+  }
+  zlib.gzip(buf, { level: 5 }, (err, gz) => {
+    if (err) {
+      res.writeHead(code, headers);
+      return res.end(buf);
+    }
+    res.writeHead(code, { ...headers, 'Content-Encoding': 'gzip', Vary: 'Accept-Encoding' });
+    res.end(gz);
+  });
+}
+
 function json(res, code, body) {
-  const payload = JSON.stringify(body);
-  res.writeHead(code, {
+  send(res, code, {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
     'Cache-Control': 'no-store',
-  });
-  res.end(payload);
+  }, JSON.stringify(body));
 }
 
 function todayUTC() {
@@ -119,16 +139,34 @@ function serveStatic(req, res, urlPath) {
     res.writeHead(403);
     return res.end('Forbidden');
   }
-  fs.readFile(filePath, (err, data) => {
-    if (err) {
+  fs.stat(filePath, (serr, st) => {
+    if (serr || !st.isFile()) {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       return res.end('Not found');
     }
-    res.writeHead(200, {
-      'Content-Type': MIME[path.extname(filePath)] || 'application/octet-stream',
-      'Cache-Control': 'no-cache',
+    // the browser keeps its copy and asks "changed?": an unchanged file costs a few bytes
+    const ext = path.extname(filePath);
+    const etag = `"${st.size.toString(16)}-${Math.round(st.mtimeMs).toString(16)}"`;
+    const headers = {
+      'Content-Type': MIME[ext] || 'application/octet-stream',
+      'Cache-Control': ext === '.woff2' ? 'public, max-age=31536000, immutable' : 'no-cache',
+      ETag: etag,
+    };
+    if (req.headers['if-none-match'] === etag) {
+      res.writeHead(304, headers);
+      return res.end();
+    }
+    fs.readFile(filePath, (err, data) => {
+      if (err) {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        return res.end('Not found');
+      }
+      if (ext === '.woff2' || ext === '.png' || ext === '.ico') {
+        res.writeHead(200, headers);
+        return res.end(data);
+      }
+      send(res, 200, headers, data);
     });
-    res.end(data);
   });
 }
 
@@ -746,8 +784,10 @@ const server = http.createServer(async (req, res) => {
       const dateYmd = normaliseDate(url.searchParams.get('date'));
       const limit = Number(url.searchParams.get('limit')) || 60;
       // a fresh saved copy means nothing to do (a keep-awake pinger must not re-analyse all day)
+      // (?maxAge=120: the scheduled pinger rebuilds only a copy older than two hours)
       const saved = DAYBOOK.getPayload('predictions', isoFromYmd(dateYmd));
-      const build = url.searchParams.get('force') === '1' || !saved || Date.now() - saved.savedAt >= 15 * 60 * 1000;
+      const maxAgeMin = Math.max(15, Number(url.searchParams.get('maxAge')) || 15);
+      const build = url.searchParams.get('force') === '1' || !saved || Date.now() - saved.savedAt >= maxAgeMin * 60 * 1000;
       if (build) freshPredictions(dateYmd, limit).then(() => freshStrongest(dateYmd, limit)).catch(() => null);
       return json(res, 202, { ok: true, date: isoFromYmd(dateYmd), building: build, daybook: DAYBOOK.status() });
     }
@@ -825,7 +865,13 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, STR.record.builderSummary());
     }
 
-    if (p === '/api/strongest/record') {
+    // the mirrored track records, for the scheduled backup (tools/records_backup.js)
+    if (p === '/api/records/export') {
+      await STR.record.settleAll().catch(() => 0);
+      return json(res, 200, PERSIST.exportAll());
+    }
+
+        if (p === '/api/strongest/record') {
       await STR.record.settleAll().catch(() => 0);
       if (url.searchParams.get('format') === 'csv') {
         res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="strongest-picks-record.csv"' });
@@ -862,7 +908,7 @@ if (dayTimer.unref) dayTimer.unref();
 // The track records survive a wiped disk when SHARPSHOOTER_RECORDS_REPO / _TOKEN are set
 // (lib/persist.js): restored on start, pushed every two minutes and on shutdown.
 PERSIST.restore().then((r) => {
-  if (r.enabled) console.log(r.error ? `  Records     mirror error: ${r.error}` : `  Records     restored ${r.entries} entries from ${r.files} mirrored files`);
+  if (r.enabled) console.log(r.error ? `  Records     mirror error: ${r.error}` : `  Records     restored ${r.entries} entries from ${r.files} saved files (${PERSIST.mode() === 'token' ? 'token' : 'scheduled backup'})`);
 }).catch(() => null);
 let stopping = false;
 for (const sig of ['SIGTERM', 'SIGINT']) {
