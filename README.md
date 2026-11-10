@@ -57,7 +57,7 @@ and at a single bookmaker's prices every slip here is close to break-even, not a
   under its stated chance is suspended for three weeks and named on the page. Replayed on the archive it found
   Brazil, Argentina and a cards drift on its own.
 - **A track record that survives restarts, with nothing to set up.** A scheduled GitHub Action saves the records
-  every ten minutes and the site reads them back when it restarts; the same visit keeps the site awake by day.
+  through the day and the site reads them back when it restarts.
 - **Faster on a phone.** Answers are gzipped (a day's predictions are about a tenth of the size), unchanged files
   are not downloaded twice.
 - **What was tested and left out.** Four ways of reading the bookmakers' price more sharply (three de-vig methods,
@@ -334,14 +334,16 @@ quarter of the time). Details in [research/v6/RESULTS.md §9](research/v6/RESULT
 
 Render's free disk is wiped on every deploy, restart and wake-up, so the live record used to start again each time.
 
-**Nothing to set up (v7, public repository).** [`.github/workflows/records.yml`](.github/workflows/records.yml) runs
-every ten minutes between 05:00 and midnight UTC. It asks the site for its records (`GET /api/records/export`),
+**Nothing to set up (v7, public repository).** [`.github/workflows/records.yml`](.github/workflows/records.yml) is
+scheduled every ten minutes between 05:00 and midnight UTC (GitHub runs schedules when it has room; on a quiet
+repository that has been as seldom as once in a few hours, and **Run workflow** on the Actions tab runs it at
+once). It asks the site for its records (`GET /api/records/export`),
 merges them into the `records` branch ([`tools/records_backup.js`](tools/records_backup.js): the earlier recording of
 an entry is kept, a settled copy replaces an unsettled one, and a freshly wiped site can never erase what was saved),
 and has the day's predictions rebuilt when the saved copy is over two hours old. When the site starts it reads that branch back by itself
-([`lib/persist.js`](lib/persist.js); Render names the repository in `RENDER_GIT_REPO_SLUG`). The same visit keeps the
-free instance awake during the day, so pages open at once; it sleeps overnight (about 590 of Render's 750 free hours a
-month). To use another address, set the repository variable `SITE_URL`.
+([`lib/persist.js`](lib/persist.js); Render names the repository in `RENDER_GIT_REPO_SLUG`). Each run also wakes
+the free instance; when GitHub runs the schedule often the site stays awake by day, when it does not the first page
+of a visit takes up to a minute. To use another address, set the repository variable `SITE_URL`.
 
 **With a token (optional, or for a private repository).** Set `SHARPSHOOTER_RECORDS_REPO` = `owner/repo` and
 `SHARPSHOOTER_RECORDS_TOKEN` = a fine-grained token for that one repository with "Contents: Read and write" in the

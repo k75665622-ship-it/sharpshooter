@@ -1,7 +1,7 @@
 # Keeps the site's track record when the host wipes its disk, and keeps the site awake during
 # the day so pages open at once.
 #
-# Every ten minutes (05:00-23:59 UTC) this asks the site for its records and commits them to the
+# Through the day (05:00-23:59 UTC) this asks the site for its records and commits them to the
 # `records` branch. When the site restarts it reads them back from that branch by itself
 # (lib/persist.js). Nothing to set up for a public repository. To point it at another address,
 # add a repository variable SITE_URL (Settings -> Secrets and variables -> Actions -> Variables).
@@ -9,7 +9,10 @@ name: Keep the track record
 
 on:
   schedule:
-    - cron: '*/10 5-23 * * *'
+    # Asked for every ten minutes, away from the top of the hour, where GitHub drops the most
+    # scheduled runs. GitHub runs schedules when it has room: on a quiet repository that can be
+    # as seldom as once in a few hours. "Run workflow" on the Actions tab runs it at once.
+    - cron: '7-59/10 5-23 * * *'
   workflow_dispatch:
 
 permissions:
