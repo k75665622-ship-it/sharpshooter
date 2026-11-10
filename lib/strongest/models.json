@@ -286,27 +286,28 @@
   }
  },
  "measured": {
-  "rule": "v3.0: 88% measured chance (89% corners and bookings), every view 75%+, bookmakers at most 93%, 13 weak markets kept off",
+  "leagues": 34,
+  "rule": "v3.1: 88% measured chance (89% corners and bookings), every view 75%+, bookmakers at most 93%, 13 weak markets kept off",
   "method": "price-anchored replay (research/v6/slips_study.js): the bookmaker-anchored and possession views; the v6 factor and stats views and the trap checks cannot be rebuilt on the archive, so the site adds checks the replay does not",
   "window": "Jul 2023 – Sept 2026",
-  "matches": 29191,
-  "matchDays": 771,
+  "matches": 27467,
+  "matchDays": 750,
   "perMatchDay": 7.8,
-  "pickShare": 0.2058,
+  "pickShare": 0.2142,
   "all": {
-   "n": 6008,
-   "hit": 0.9056,
-   "stated": 0.9058
+   "n": 5883,
+   "hit": 0.9063,
+   "stated": 0.9059
   },
   "tiers": {
    "Strong": {
-    "n": 2380,
-    "hit": 0.8903,
+    "n": 2331,
+    "hit": 0.891,
     "stated": 0.8914
    },
    "Elite": {
-    "n": 3628,
-    "hit": 0.9157,
+    "n": 3552,
+    "hit": 0.9164,
     "stated": 0.9153
    }
   },
@@ -318,14 +319,14 @@
     "label": "Either team to win"
    },
    "DC": {
-    "n": 1081,
-    "hit": 0.9167,
-    "stated": 0.9092,
+    "n": 983,
+    "hit": 0.9227,
+    "stated": 0.9098,
     "label": "Double chance"
    },
    "TT_O0.5": {
-    "n": 2443,
-    "hit": 0.9108,
+    "n": 2418,
+    "hit": 0.9107,
     "stated": 0.905,
     "label": "Team to score"
    },
@@ -365,17 +366,17 @@
     "stated": 0.9271,
     "label": "Home or draw & over 1.5"
    },
-   "WIN": {
-    "n": 4,
-    "hit": 1,
-    "stated": 0.9225,
-    "label": "Match winner"
-   },
    "H2_O0.5": {
     "n": 36,
     "hit": 0.8889,
     "stated": 0.9138,
     "label": "Goal in the 2nd half"
+   },
+   "WIN": {
+    "n": 2,
+    "hit": 1,
+    "stated": 0.922,
+    "label": "Match winner"
    },
    "C_MOST": {
     "n": 5,
@@ -399,151 +400,151 @@
   "slips": {
    "safe": {
     "target": 0.75,
-    "n": 613,
-    "landed": 0.8042,
-    "stated": 0.7954,
-    "legs": 2.7,
-    "fairOdds": 1.28
+    "n": 601,
+    "landed": 0.8103,
+    "stated": 0.7956,
+    "legs": 2.6,
+    "fairOdds": 1.27
    },
    "long": {
     "target": 0.6,
-    "n": 613,
-    "landed": 0.6786,
-    "stated": 0.6816,
+    "n": 601,
+    "landed": 0.6789,
+    "stated": 0.682,
     "legs": 4.3,
     "fairOdds": 1.51
    },
    "all": {
-    "n": 771,
-    "landed": 0.5681,
-    "stated": 0.5791,
+    "n": 750,
+    "landed": 0.572,
+    "stated": 0.5765,
     "legs": 7.8
    },
    "bySize": {
     "1": {
-     "n": 771,
-     "landed": 0.917,
-     "stated": 0.9184
+     "n": 750,
+     "landed": 0.9253,
+     "stated": 0.9187
     },
     "2": {
-     "n": 613,
-     "landed": 0.8336,
-     "stated": 0.8421
+     "n": 601,
+     "landed": 0.8369,
+     "stated": 0.842
     },
     "3": {
-     "n": 502,
-     "landed": 0.8048,
-     "stated": 0.7717
+     "n": 491,
+     "landed": 0.8004,
+     "stated": 0.7714
     },
     "4": {
-     "n": 433,
-     "landed": 0.6952,
-     "stated": 0.7059
+     "n": 428,
+     "landed": 0.6963,
+     "stated": 0.7052
     },
     "5": {
-     "n": 363,
-     "landed": 0.6556,
-     "stated": 0.6467
+     "n": 352,
+     "landed": 0.6534,
+     "stated": 0.6472
     },
     "6": {
-     "n": 313,
-     "landed": 0.6102,
+     "n": 303,
+     "landed": 0.6205,
      "stated": 0.5916
     },
     "8": {
-     "n": 262,
-     "landed": 0.5038,
-     "stated": 0.4898
+     "n": 259,
+     "landed": 0.5058,
+     "stated": 0.4896
     },
     "10": {
-     "n": 230,
-     "landed": 0.4,
-     "stated": 0.4019
+     "n": 229,
+     "landed": 0.393,
+     "stated": 0.4017
     },
     "15": {
-     "n": 158,
-     "landed": 0.2468,
-     "stated": 0.2434
+     "n": 156,
+     "landed": 0.2436,
+     "stated": 0.2431
     }
    }
   },
   "tuning": {
    "window": "Jul 2019 – Jun 2023",
-   "matches": 47337,
-   "perMatchDay": 9.3,
+   "matches": 42750,
+   "perMatchDay": 9.4,
    "all": {
-    "n": 11129,
-    "hit": 0.9074,
-    "stated": 0.9067
+    "n": 10558,
+    "hit": 0.9099,
+    "stated": 0.9068
    },
    "slips": {
     "safe": {
      "target": 0.75,
-     "n": 1011,
-     "landed": 0.8042,
-     "stated": 0.7918,
+     "n": 961,
+     "landed": 0.8127,
+     "stated": 0.7928,
      "legs": 2.7,
      "fairOdds": 1.28
     },
     "long": {
      "target": 0.6,
-     "n": 1011,
-     "landed": 0.6864,
-     "stated": 0.6764,
-     "legs": 4.4,
+     "n": 961,
+     "landed": 0.7024,
+     "stated": 0.6786,
+     "legs": 4.3,
      "fairOdds": 1.52
     },
     "all": {
-     "n": 1195,
-     "landed": 0.5506,
-     "stated": 0.5418,
-     "legs": 9.3
+     "n": 1125,
+     "landed": 0.5707,
+     "stated": 0.5394,
+     "legs": 9.4
     },
     "bySize": {
      "1": {
-      "n": 1195,
-      "landed": 0.923,
-      "stated": 0.9194
+      "n": 1125,
+      "landed": 0.9351,
+      "stated": 0.9192
      },
      "2": {
-      "n": 1011,
-      "landed": 0.8526,
-      "stated": 0.8418
+      "n": 961,
+      "landed": 0.8616,
+      "stated": 0.842
      },
      "3": {
-      "n": 864,
-      "landed": 0.7766,
-      "stated": 0.7704
+      "n": 813,
+      "landed": 0.7847,
+      "stated": 0.7706
      },
      "4": {
-      "n": 743,
-      "landed": 0.7174,
-      "stated": 0.7036
+      "n": 700,
+      "landed": 0.7229,
+      "stated": 0.7038
      },
      "5": {
-      "n": 649,
-      "landed": 0.6533,
-      "stated": 0.6422
+      "n": 608,
+      "landed": 0.6645,
+      "stated": 0.6427
      },
      "6": {
-      "n": 565,
-      "landed": 0.5858,
-      "stated": 0.5871
+      "n": 526,
+      "landed": 0.6065,
+      "stated": 0.5874
      },
      "8": {
-      "n": 450,
-      "landed": 0.4911,
-      "stated": 0.4883
+      "n": 426,
+      "landed": 0.5047,
+      "stated": 0.4888
      },
      "10": {
-      "n": 373,
-      "landed": 0.3807,
-      "stated": 0.406
+      "n": 360,
+      "landed": 0.4,
+      "stated": 0.4057
      },
      "15": {
-      "n": 274,
-      "landed": 0.2226,
-      "stated": 0.2509
+      "n": 271,
+      "landed": 0.2362,
+      "stated": 0.2503
      }
     }
    }

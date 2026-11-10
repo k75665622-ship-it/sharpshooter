@@ -37,6 +37,7 @@
       const merged = window.SS ? window.SS.mergeStrongest(SP.data && SP.date === date ? SP.data : null, d) : d;
       SP.data = merged;
       SP.date = date;
+      SP.at = Date.now();
       if (window.DayCache) window.DayCache.putPayload('strongest', date, merged);
       // the server answered from its day book and is rebuilding: look again shortly
       clearTimeout(SP.poll);
@@ -126,6 +127,17 @@
           ${sl.id === 'all' ? ' Each extra pick is one more way to lose the whole slip.' : ''}
           Bookmakers usually pay a little under the fair odds.</div>
       </div>`;
+  }
+
+  /** The live guard (lib/strongest/guard.js): what it has paused, and what it is watching. */
+  function guardBlock(g) {
+    if (!g) return '';
+    const sus = g.suspended || [];
+    const watch = g.watch || [];
+    if (!sus.length && !watch.length) return '';
+    const line = (x) => `<b>${esc(x.name)}</b> won ${p0(x.won)} of its last ${x.n} picks (they said ${p0(x.stated)})`;
+    return `<div class="meas-note sp-guard">${sus.length ? `<b>Paused by the live guard.</b> ${sus.map((x) => `${line(x)}, so it gives no pick until ${esc(String(x.until || '').slice(0, 10))}`).join('; ')}. ` : ''}
+      ${watch.length ? `Being watched: ${watch.map(line).join('; ')}.` : ''}</div>`;
   }
 
   /**
@@ -280,14 +292,15 @@
     const upcoming = (d.matches || []).filter((m) => !m.started);
 
     el.innerHTML = `<div class="m-intro sp-intro">
-        <div class="sp-kicker">Strongest Picks · ${esc(fmtDateLong(d.date || state.date))}</div>
-        <h2>The picks every view agrees on — at a measured chance</h2>
-        <p>Each match is priced across SportyBet's nine markets — Goals, Corners, Half, Players, Minutes, Team, Match, Bookings and Special — by independent views:
-        the bookmakers' price, a stats model, the v6 factors and a <b>possession model</b> (shots a game × goals per shot, for both sides). The chance shown is
-        <b>measured</b>: what picks like it actually won on past matches. A pick makes this list only at <b>${p0(cfg.minChance || 0.88)}+</b>
-        with every view at ${p0(cfg.floor)}+, the bookmakers' price behind it, no trap flagged, in a league the rule was tested on, and never a team under,
-        clean sheet or "both teams to score: No" (they did not hold up). There is <b>no fixed number</b>: a weak day gives few picks.</p>
-        <details class="sp-rules"><summary>How a pick qualifies</summary><ul class="rules">${(d.rules || []).map((r) => `<li>${esc(r)}</li>`).join('')}</ul></details>
+        <div class="sp-kicker">${esc(fmtDateLong(d.date || state.date))}</div>
+        <h2>The strongest pick of each match</h2>
+        <p>A pick is listed only when its <b>measured chance is ${p0(cfg.minChance || 0.88)} or better</b>: what picks like it actually won on past matches.
+        Every independent view of the match has to agree, the bookmakers' price has to be behind it, and the league has to be one the rule was tested on.
+        There is no fixed number: a weak day gives few picks.</p>
+        <details class="sp-rules"><summary>How a pick qualifies</summary>
+          <p class="muted-t">Each match is priced across nine market groups (goals, corners, halves, players, minutes, team goals, result, bookings, specials) by up to four views that do not share their inputs:
+          the bookmakers' price, a stats model, the measured factors and a possession model (shots a game × goals per shot).</p>
+          <ul class="rules">${(d.rules || []).map((r) => `<li>${esc(r)}</li>`).join('')}</ul></details>
       </div>
       <div class="sumstrip">
         <div class="ss-cell st-lock"><div class="v">${picks.length}</div><div class="k">Strongest Picks</div></div>
@@ -295,6 +308,7 @@
         <div class="ss-cell"><div class="v">${upcoming.length}</div><div class="k">Matches still to play</div></div>
         <div class="ss-cell"><div class="v">${rec && rec.hitRate != null ? pct(rec.hitRate, 0) : '—'}</div><div class="k">${rec && rec.n ? `Record: ${rec.won}/${rec.n} won` : 'Record starts today'}</div></div>
       </div>
+      ${guardBlock(d.guard)}
       ${publishedCard(d.publishedSlip) ? `<div class="sp-slips sp-pub">${publishedCard(d.publishedSlip)}</div>` : ''}
       ${d.counts && d.counts.untested ? `<p class="muted-t sp-note">${d.counts.untested} upcoming match${d.counts.untested === 1 ? ' is' : 'es are'} in leagues the rule was never measured on, so ${d.counts.untested === 1 ? 'it gets' : 'they get'} no Strongest Pick. ${d.counts.untested === 1 ? 'Its' : 'Their'} markets still show on the match cards below.</p>` : ''}
       ${picks.length ? `<div class="sp-bar">
@@ -335,9 +349,11 @@
   }
 
   /** The day's Strongest Picks for other tabs (the High Banker leads with their safe slip). */
-  window.strongestDay = function () {
-    if (SP.data && SP.date === state.date && !SP.loading) return Promise.resolve(SP.data);
-    return load(false).then((d) => d || (SP.date === state.date ? SP.data : null));
+  window.strongestDay = function (force) {
+    // a copy under five minutes old is used as it is; older, the server is asked again
+    const fresh = SP.at && Date.now() - SP.at < 5 * 60 * 1000;
+    if (!force && fresh && SP.data && SP.date === state.date && !SP.loading) return Promise.resolve(SP.data);
+    return load(!!force, !force && !!SP.data && SP.date === state.date).then((d) => d || (SP.date === state.date ? SP.data : null));
   };
   window.strongestSlipCard = slipCard;
   window.strongestPublishedCard = publishedCard;

@@ -1,0 +1,158 @@
+/* ============================================================
+   Sharpshooter — Today
+   The safe slip is drawn as what it is: a betting ticket, with a tear line and a stamp once it
+   is settled. It is the one loud thing on the page; everything round it is plain rows.
+   Everything here is prefixed td- or ticket-.
+   ============================================================ */
+
+.td { max-width: 1080px; margin: 0 auto; }
+.td-head { margin: 4px 0 14px; }
+.td-head h1 { margin: 0; font-size: 34px; }
+.td-head p { margin: 4px 0 0; color: var(--text-2); font-size: 14px; }
+.td-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; }
+.td-main, .td-side { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+@media (min-width: 900px) {
+  .td-head h1 { font-size: 44px; }
+  .td-grid { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+}
+
+/* ---- the ticket ---- */
+.ticket {
+  position: relative; background: var(--surface); border: 1.5px solid var(--ink); border-radius: 16px;
+  box-shadow: 4px 4px 0 var(--green-line);
+}
+.ticket.is-lost { box-shadow: 4px 4px 0 var(--red-line); }
+.ticket.is-empty, .ticket.is-loading { border-style: dashed; border-color: var(--border-strong); box-shadow: none; }
+.ticket-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; padding: 16px 18px 12px; }
+.ticket-head h2 { margin: 0; font-size: 30px; }
+.ticket-head p { margin: 3px 0 0; font-size: 13px; color: var(--text-2); max-width: 44ch; }
+.ticket-chance { text-align: right; flex: 0 0 auto; }
+.ticket-chance b { display: block; font-family: var(--display); font-weight: 700; font-size: 52px; line-height: .9; color: var(--green); }
+.ticket.is-lost .ticket-chance b { color: var(--text-3); }
+.ticket-chance span { display: block; margin-top: 4px; font-size: 12px; color: var(--text-3); }
+.ticket-legs { list-style: none; margin: 0; padding: 0 18px; }
+.ticket-legs li, .td-pick {
+  display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; gap: 10px; align-items: center;
+  padding: 11px 0; border-top: 1px solid var(--border);
+}
+.tk-t { font-family: var(--display); font-weight: 600; font-size: 17px; color: var(--text-3); }
+.tk-l { min-width: 0; }
+.tk-l b { display: block; font-size: 15.5px; line-height: 1.25; overflow-wrap: anywhere; }
+.tk-l small { display: block; font-size: 12.5px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tk-p { font-family: var(--display); font-weight: 700; font-size: 21px; text-align: right; white-space: nowrap; }
+.tk-p small { font-family: var(--sans); font-weight: 600; font-size: 12px; color: var(--text-3); }
+.tk-p .pos, .pos { color: var(--green); }
+.tk-p .neg, .neg { color: var(--red); }
+.ticket-legs li.sk { height: 44px; display: block; }
+.ticket-legs li.sk::after { content: ""; display: block; height: 14px; margin-top: 4px; border-radius: 7px; background: var(--surface-3); animation: pulse 1.2s infinite; }
+
+/* the tear line: a dashed rule with a notch punched out of each edge */
+.ticket-foot {
+  position: relative; display: flex; align-items: center; gap: 22px; flex-wrap: wrap;
+  margin-top: 4px; padding: 14px 18px 16px; border-top: 2px dashed var(--border-strong);
+}
+.ticket-foot::before, .ticket-foot::after {
+  content: ""; position: absolute; top: -10px; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--bg); border: 1.5px solid var(--ink);
+}
+.ticket-foot::before { left: -10.5px; clip-path: inset(0 0 0 50%); }
+.ticket-foot::after { right: -10.5px; clip-path: inset(0 50% 0 0); }
+.ticket-foot > div span { display: block; font-size: 12px; color: var(--text-3); }
+.ticket-foot > div b { font-family: var(--display); font-weight: 700; font-size: 24px; line-height: 1.1; }
+.ticket-foot > div b small { font-family: var(--sans); font-weight: 500; font-size: 12px; color: var(--text-3); }
+.ticket-foot .btn { margin-left: auto; }
+
+/* the stamp on a settled slip */
+.stamp {
+  position: absolute; top: 12px; right: 118px; z-index: 1; transform: rotate(-9deg);
+  font-family: var(--display); font-weight: 700; font-size: 26px; line-height: 1; letter-spacing: .04em;
+  padding: 5px 12px 4px; border: 3px solid currentColor; border-radius: 8px; background: var(--surface);
+}
+.stamp.won { color: var(--green); }
+.stamp.lost { color: var(--red); }
+.stamp.void { color: var(--text-3); }
+
+.btn {
+  border: 1.5px solid var(--ink); background: var(--ink); color: var(--on-ink); border-radius: 999px;
+  padding: 9px 18px; font-weight: 700; font-size: 13.5px; cursor: pointer;
+}
+.btn:hover { opacity: .88; }
+.btn-quiet { background: transparent; color: var(--text); border-color: var(--border-strong); align-self: flex-start; margin-top: 12px; }
+.btn-quiet:hover { border-color: var(--ink); opacity: 1; }
+
+/* ---- plain blocks ---- */
+.td-block h3 { margin: 0 0 8px; font-size: 22px; }
+.td-note { margin: 8px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--text-3); max-width: 62ch; }
+.td-note b { color: var(--text); font-weight: 600; }
+
+.td-banker {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 14px; text-align: left;
+  background: var(--surface); border: 1px solid var(--border); border-left: 5px solid var(--green); border-radius: var(--radius-sm);
+  padding: 12px 14px; cursor: pointer;
+}
+.td-banker:hover { border-color: var(--border-strong); border-left-color: var(--green); }
+.td-b-main { min-width: 0; }
+.td-b-main b { display: block; font-size: 17px; line-height: 1.25; overflow-wrap: anywhere; }
+.td-b-main small { display: block; margin-top: 2px; font-size: 12.5px; color: var(--text-3); }
+.td-b-num { text-align: right; flex: 0 0 auto; }
+.td-b-num b { display: block; font-family: var(--display); font-weight: 700; font-size: 34px; line-height: .95; color: var(--green); }
+.td-b-num small { font-size: 12px; color: var(--text-3); }
+
+/* the last days */
+.td-days { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.td-days li + li { border-top: 1px solid var(--border); }
+.td-day {
+  width: 100%; display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; text-align: left;
+  background: none; border: 0; padding: 10px 12px; cursor: pointer; font-size: 13px;
+}
+.td-day:hover { background: var(--surface-2); }
+.td-d { font-weight: 600; }
+.td-marks { display: flex; flex-wrap: wrap; gap: 3px; min-width: 0; }
+.td-marks .m { width: 9px; height: 14px; border-radius: 2px; background: var(--border-strong); }
+.td-marks .m.w { background: var(--green); }
+.td-marks .m.l { background: var(--red); }
+.td-score { color: var(--text-2); white-space: nowrap; }
+.td-slip { grid-column: 2 / -1; font-size: 12px; font-weight: 600; color: var(--text-3); }
+.td-slip.won { color: var(--green); }
+.td-slip.lost { color: var(--red); }
+
+/* the ladder */
+.td-ladder { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.td-rung {
+  display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(40px, 1fr) auto; gap: 12px; align-items: center; text-align: left;
+  background: none; border: 0; padding: 11px 12px; cursor: pointer;
+}
+.td-rung + .td-rung { border-top: 1px solid var(--border); }
+.td-rung:hover { background: var(--surface-2); }
+.td-r-name b { display: block; font-size: 14.5px; }
+.td-r-name small, .td-r-num small { display: block; font-size: 12px; color: var(--text-3); }
+.td-r-bar { height: 10px; border-radius: 5px; background: var(--surface-3); overflow: hidden; }
+.td-r-bar i { display: block; height: 100%; border-radius: 5px; background: var(--green); }
+.td-r-num { text-align: right; }
+.td-r-num b { font-family: var(--display); font-weight: 700; font-size: 24px; line-height: 1; }
+
+/* the day's picks */
+.td-picks { list-style: none; margin: 0; padding: 0 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.td-picks li:first-child .td-pick { border-top: 0; }
+.td-pick { width: 100%; background: none; border-left: 0; border-right: 0; border-bottom: 0; cursor: pointer; text-align: left; }
+.td-pick:hover .tk-l b { color: var(--accent); }
+.td-pick.is-done { cursor: default; }
+.td-pick.is-done:hover .tk-l b { color: inherit; }
+.td-note-top { margin: 0 0 8px; }
+
+.td-guard { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--text-3); padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--border); }
+.td-guard b { color: var(--text); }
+.td-guard.warn { border-color: var(--amber-line); background: var(--amber-soft); color: var(--amber); }
+.td-guard.warn b { color: var(--amber); }
+.td-foot { margin: 22px 0 0; font-size: 12.5px; color: var(--text-3); max-width: 70ch; }
+
+@media (max-width: 420px) {
+  .ticket-head { padding: 14px 14px 10px; }
+  .ticket-head h2 { font-size: 26px; }
+  .ticket-chance b { font-size: 44px; }
+  .ticket-legs { padding: 0 14px; }
+  .ticket-foot { padding: 12px 14px 14px; gap: 14px; }
+  .stamp { right: 96px; font-size: 22px; }
+  .td-day { grid-template-columns: 84px minmax(0, 1fr) auto; }
+  .td-rung { grid-template-columns: minmax(0, 1.3fr) minmax(30px, .7fr) auto; gap: 8px; }
+}

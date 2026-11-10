@@ -1,0 +1,62 @@
+# Keeps the site's track record when the host wipes its disk, and keeps the site awake during
+# the day so pages open at once.
+#
+# Every ten minutes (05:00-23:59 UTC) this asks the site for its records and commits them to the
+# `records` branch. When the site restarts it reads them back from that branch by itself
+# (lib/persist.js). Nothing to set up for a public repository. To point it at another address,
+# add a repository variable SITE_URL (Settings -> Secrets and variables -> Actions -> Variables).
+name: Keep the track record
+
+on:
+  schedule:
+    - cron: '*/10 5-23 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: records
+  cancel-in-progress: false
+
+env:
+  SITE_URL: ${{ vars.SITE_URL || 'https://sharpshooter-09br.onrender.com' }}
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+        with:
+          path: main
+
+      - name: Check out the records branch
+        run: |
+          git init -q records-branch
+          cd records-branch
+          git remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          if git fetch -q --depth 1 origin records; then
+            git checkout -q -b records FETCH_HEAD
+          else
+            git checkout -q --orphan records
+          fi
+
+      - name: Save the records (this also wakes the site)
+        run: node main/tools/records_backup.js --site "$SITE_URL" --dir records-branch/records
+
+      - name: Warm the day's predictions
+        # builds the day in the background only when the saved copy is missing or over two hours old
+        run: curl -fsS --max-time 60 "$SITE_URL/api/warmup?maxAge=120" > /dev/null || true
+
+      - name: Commit what changed
+        run: |
+          cd records-branch
+          git add -A records
+          if git diff --cached --quiet; then
+            echo "Nothing new."
+          else
+            git -c user.name="sharpshooter-records" -c user.email="records@users.noreply.github.com" commit -q -m "records: $(date -u '+%Y-%m-%d %H:%M') UTC"
+            git push -q origin records
+          fi

@@ -1,4 +1,4 @@
-# SHARPSHOOTER v6
+# SHARPSHOOTER v7
 
 A football prediction engine that runs on **live data from free, key-less sources**.
 
@@ -19,6 +19,28 @@ See [`methodology/GENERAL-PREDICTION-v6.md`](methodology/GENERAL-PREDICTION-v6.m
 [METHODOLOGY.md](METHODOLOGY.md) and the playbooks in [`methodology/`](methodology/).
 
 ---
+
+## What's new in v7
+
+- **A new site, built for the phone.** It opens on **Today**: the day's safe slip drawn as a ticket (stamped won or
+  lost once it is settled), the banker of the day, a ladder of bigger slips with the chance each one lands, the last
+  days' results, and the day's picks. Five sections along the bottom of the screen (Today, Picks, Slips, Matches,
+  Record), light and dark themes, large numerals in a condensed scoreboard face served from the site itself.
+- **Picks in 34 measured leagues** (was 18). The rule was replayed in every division of the archive: it held in
+  England 5, Scotland 2-4 and twelve more leagues (USA, Mexico, Japan, China, Sweden, Norway, Denmark, Austria,
+  Switzerland, Poland, Romania, Russia), and **failed in Brazil and Argentina**, which now get no pick. Held-out
+  2023-26 on the 34: **90.6% won** (stated 90.6%, 5,883 picks); the day's single strongest pick won **92.5%** of 750
+  days; the safe slip landed **81.0%** of 601 days.
+- **A live guard.** The rule checks itself against its own settled picks: a market or a league that runs clearly
+  under its stated chance is suspended for three weeks and named on the page. Replayed on the archive it found
+  Brazil, Argentina and a cards drift on its own.
+- **A track record that survives restarts, with nothing to set up.** A scheduled GitHub Action saves the records
+  every ten minutes and the site reads them back when it restarts; the same visit keeps the site awake by day.
+- **Faster on a phone.** Answers are gzipped (a day's predictions are about a tenth of the size), unchanged files
+  are not downloaded twice.
+- **What was tested and left out.** Four ways of reading the bookmakers' price more sharply (three de-vig methods,
+  best-of-books prices, the Asian handicap line) were measured on 160,666 matches: none beat the engine by more
+  than one part in ten thousand, so the core probabilities are unchanged. Details: [research/v7/RESULTS.md](research/v7/RESULTS.md).
 
 ## High Banker — the day's safest picks, 3.0+ odds
 
@@ -103,16 +125,23 @@ it actually won on past matches, given what each view said — a per-market cali
 it learned: the v6 factors' disagreement with the price is real but worth about 40% of its size, and a form-only
 view that disagrees with the bookmakers is on the **wrong** side of them in every market measured.
 
-**A pick qualifies when (v3.0, v6.2):** its measured chance is at least **88%** (**89%** for corners and bookings,
+**A pick qualifies when (rule v3.1):** its measured chance is at least **88%** (**89%** for corners and bookings,
 which have no bookmaker price of their own and are only priced when the bookmakers' read of the match exists); every
 view rates it at least **75%**; the bookmakers' own probability is at most **93%** (it still pays 1.08+); the v6 layer
 does not flag it as a trap or overrated by the price; no serious team news hits the side it backs; the market has a
-measured record (minute markets and scorers do not); and the match is in one of the **18 leagues the rule was measured
-on** (England 1-4, Scotland, Germany 1-2, Italy 1-2, Spain 1-2, France 1-2, Netherlands, Belgium, Portugal, Turkey,
-Greece). **Team unders and clean sheets, "both teams to score: No", away-or-draw & over 1.5 and total corners under
-are kept off the list, the match cards and the bet builders**: they paid 1.10-1.15 and filled half the old list, or
-won clearly less than stated in both research periods. Strength is the measured chance: **Elite** 90%+, **Strong**
-88%+. Every number lives in [`lib/strongest/config.js`](lib/strongest/config.js).
+measured record (minute markets and scorers do not); the match is in one of the **34 leagues the rule was measured
+on** (England 1-5, Scotland 1-4, Germany 1-2, Italy 1-2, Spain 1-2, France 1-2, Netherlands, Belgium, Portugal, Turkey,
+Greece, USA, Mexico, Japan, China, Sweden, Norway, Denmark, Austria, Switzerland, Poland, Romania, Russia — Brazil and
+Argentina were measured and failed); and the **live guard** has not suspended its market or league. **Team unders and
+clean sheets, "both teams to score: No", away-or-draw & over 1.5 and total corners under are kept off the list, the
+match cards and the bet builders**: they paid 1.10-1.15 and filled half the old list, or won clearly less than stated
+in both research periods. Strength is the measured chance: **Elite** 90%+, **Strong** 88%+. Every number lives in
+[`lib/strongest/config.js`](lib/strongest/config.js).
+
+**The live guard** ([`lib/strongest/guard.js`](lib/strongest/guard.js)) reads the rule's own settled picks. When the
+last 120 picks of a market family or a league (30 at least) won 2.5 standard errors less than they said, it is
+suspended for 21 days, named on the page with its numbers, and let back with a clean slate. On honest markets it is
+neutral (it cost under 2% of the picks in the replay and moved the hit rate by less than a tenth of a point).
 
 **Slips.** Picks are from different matches, so on one slip their chances multiply: ten 88% picks land together only
 28% of the time. The tab builds the day's **safe slip** (the strongest picks while the combined chance stays at 75%+),
@@ -123,13 +152,14 @@ matches, and a table of how often a slip of N picks landed.
 (`research/v6/slips_study.js` + `slips_report.js`; [research/v6/RESULTS.md §9](research/v6/RESULTS.md)), the bars
 chosen on 2019-23 and the 2023-26 seasons reported apart:
 
-| Held-out 2023-26 (29,191 matches) | Old rule (v2, 84%) | **New rule (v3, 88%)** |
+| Held-out 2023-26 | Old rule (v2, 84%, 18 leagues) | **Rule v3.1 (88%, 34 leagues)** |
 |---|---|---|
 | Strongest Picks a match day | ~21 (54% of them team unders) | **~8** |
-| Won (stated) | 86.5% (86.5%) | **90.6% (90.6%)** |
-| Elite / Strong | 87.6% / 85.5% | **91.6% / 89.0%** |
-| Safe slip (75%+ combined) | — | **80.4% landed, 2.7 legs, fair odds 1.28** (613 days) |
-| A slip of 5 / 10 picks | 51.7% / 25.1% | 65.6% / 40.0% |
+| Won (stated) | 86.5% (86.5%) | **90.6% (90.6%)** — 5,883 picks |
+| Elite / Strong | 87.6% / 85.5% | **91.6% / 89.1%** |
+| The day's single strongest pick | 87.2% | **92.5%** of 750 days |
+| Safe slip (75%+ combined) | — | **81.0% landed, 2.6 legs, fair odds 1.27** (601 days) |
+| A slip of 5 / 10 picks | 51.7% / 25.1% | 65.3% / 39.3% |
 
 Even at 90%, about one pick in ten loses, and the longer the slip the likelier one of its legs does.
 
@@ -280,18 +310,23 @@ quarter of the time). Details in [research/v6/RESULTS.md §9](research/v6/RESULT
 
 ## Keeping the track record (Render free tier)
 
-Render's free disk is wiped on every deploy, restart and wake-up, so the live record started again each time. Set
-two environment variables and the Strongest Picks, safe slips, bet builders and High Banker records are mirrored to
-a `records` branch of a GitHub repository and restored on start ([`lib/persist.js`](lib/persist.js)):
+Render's free disk is wiped on every deploy, restart and wake-up, so the live record used to start again each time.
 
-1. On GitHub: **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**.
-   Repository access: **only** the repository the records go to. Permissions: **Contents: Read and write**. Nothing else.
-2. On Render: your service → **Environment** → add `SHARPSHOOTER_RECORDS_REPO` = `owner/repo` and
-   `SHARPSHOOTER_RECORDS_TOKEN` = the token. Optionally `SHARPSHOOTER_RECORDS_BRANCH` (default `records`).
+**Nothing to set up (v7, public repository).** [`.github/workflows/records.yml`](.github/workflows/records.yml) runs
+every ten minutes between 05:00 and midnight UTC. It asks the site for its records (`GET /api/records/export`),
+merges them into the `records` branch ([`tools/records_backup.js`](tools/records_backup.js): the earlier recording of
+an entry is kept, a settled copy replaces an unsettled one, and a freshly wiped site can never erase what was saved),
+and has the day's predictions rebuilt when the saved copy is over two hours old. When the site starts it reads that branch back by itself
+([`lib/persist.js`](lib/persist.js); Render names the repository in `RENDER_GIT_REPO_SLUG`). The same visit keeps the
+free instance awake during the day, so pages open at once; it sleeps overnight (about 590 of Render's 750 free hours a
+month). To use another address, set the repository variable `SITE_URL`.
 
-The branch is created from the default branch if missing; Render deploys from your main branch, so record writes
-never trigger a redeploy. Records are pushed at most every two minutes and on shutdown. `GET /api/health` shows the
-mirror's status (never the token).
+**With a token (optional, or for a private repository).** Set `SHARPSHOOTER_RECORDS_REPO` = `owner/repo` and
+`SHARPSHOOTER_RECORDS_TOKEN` = a fine-grained token for that one repository with "Contents: Read and write" in the
+host's environment: the site then reads and writes the branch itself, every two minutes and on shutdown.
+
+Either way the records live on a `records` branch, never on the branch the host deploys from, so saving them never
+triggers a redeploy. `GET /api/health` shows the mirror's status (never a token).
 
 ## What's new in v6
 
@@ -829,6 +864,7 @@ the distortion but does not eliminate the extra uncertainty.
 | `GET /api/bankers?date=&limit=`          | Legacy banker election (superseded)           |
 | `GET /api/strongest?date=`               | Strongest Picks: nine SportyBet market groups per match, one pick per match when every view agrees |
 | `GET /api/strongest/record`              | Strongest Picks track record (`?format=csv` to download) |
+| `GET /api/records/export`                | The saved records (picks, safe slips, builders, High Banker) for the scheduled backup |
 | `GET /api/betbuilder?date=`              | Bet Builder: per match, 3-5 selections at 3.0+ fair odds from one joint model of the match, and every match's model for "build your own" |
 | `GET /api/betbuilder/record`             | Bet Builder track record, legs included (`?format=csv` to download) |
 
@@ -857,7 +893,8 @@ sharpshooter/
 │   ├── scoreline.js    predicted / most likely / half-time score
 │   ├── general.js      general prediction for every fixture
 │   ├── ledger.js       pre-match record + settlement (picks, value picks, accumulators)
-│   ├── persist.js      opt-in mirror of the track records to a GitHub branch (survives a wiped disk)
+│   ├── persist.js      the track records on a GitHub branch: read back on start, written by the scheduled backup or with a token
+│   ├── devig.js        ways of removing the bookmaker's margin (research/v7/devig_study.js)
 │   ├── crawler/        v6 polite crawler: http.js (robots, rate limits, conditional GET, cache),
 │   │                   sources/ (football-data, ClubElo momentum, Open-Meteo), warehouse.js
 │   ├── factors/        v6 factor engine: records, history store, 170 factors, tree-model evaluator, models/
@@ -876,7 +913,11 @@ sharpshooter/
 ├── test/               v5 unit tests, offline end-to-end test, fixtures
 ├── backtest_methodology.js  walk-forward backtest
 ├── test_methodology.js      methodology checks
-├── public/             front-end (vanilla JS, no build step); betbuilder-core.js is the joint match model
+├── public/             front-end (vanilla JS, no build step): app.js (shell, five sections), today.js (the Today page),
+│                       strongest.js, banker.js, betbuilder.js, tiers.js; styles.css holds the light and dark themes;
+│                       fonts/ the display typeface (Barlow Condensed, OFL); betbuilder-core.js is the joint match model
+├── tools/              records_backup.js: saves the track records to the `records` branch (run by the scheduled workflow)
+├── .github/workflows/  records.yml: the ten-minute backup and keep-awake visit
 │                       shared by the server and the Bet Builder tab
 └── data/               disk cache (auto-created)
 ```
@@ -974,4 +1015,4 @@ The day's predictions are saved twice, and both copies are wiped when the predic
 
 **Played matches stay.** A match that has kicked off keeps the prediction made *before* kick-off (frozen, never re-predicted) and gets a ✓ / ✕ for the main pick, value pick, methodology pick, result, goals, BTTS and exact score, plus a "Today so far" scoreboard on Every Match. The morning accumulator is kept with each leg ticked or crossed; a newer one for the matches still to play sits beside it. The merge and settle rules live in `public/shared.js`, used by both server and browser.
 
-`GET /api/daybook` shows what is stored. `GET /api/warmup` builds the day in the background (it does nothing when the saved copy is under 15 minutes old). On Render's free tier the server disk is wiped when the service sleeps, so the browser copy is what keeps your day; to keep the server copy too, point a free cron service at `/api/warmup` at 05:05 and at `/api/health` every 10 minutes. Change the reset with `DAYBOOK_TZ` / `DAYBOOK_RESET_HOUR`.
+`GET /api/daybook` shows what is stored. `GET /api/warmup` builds the day in the background (it does nothing when the saved copy is under 15 minutes old). On Render's free tier the server disk is wiped when the service sleeps; the scheduled workflow (`.github/workflows/records.yml`) visits the site every ten minutes by day, which keeps it awake and its day book warm. Change the reset with `DAYBOOK_TZ` / `DAYBOOK_RESET_HOUR`.

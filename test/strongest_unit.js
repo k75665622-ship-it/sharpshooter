@@ -186,7 +186,7 @@ const mk = (key, group, views, kind = 'goals', extra = {}) => {
   t('serious news on the backed side blocks it', PK.blockers(mk('1', 'Match', { market: 0.9, stats: 0.89 }), { ...ctxOk, news: { home: { highs: 2 }, away: { highs: 0 } } }).some((w) => /team-news/.test(w)));
   t('serious news on the other side does not', PK.blockers(mk('1', 'Match', { market: 0.9, stats: 0.89 }), { ...ctxOk, news: { home: { highs: 0 }, away: { highs: 2 } } }).length === 0);
   t('a tested league qualifies', PK.blockers(s, { ...ctxOk, league: 'eng.1' }).length === 0);
-  t('a league the rule was never measured on blocks it', PK.blockers(s, { ...ctxOk, league: 'sau.1' }).some((w) => /never measured on this league/.test(w)));
+  t('a league the rule was never measured on blocks it', PK.blockers(s, { ...ctxOk, league: 'sau.1' }).some((w) => /never measured on this league/.test(w)) && PK.blockers(s, { ...ctxOk, league: 'uefa.champions' }).some((w) => /never measured/.test(w)));
   const c = mk('CH_O4.5', 'Corners', { model: 0.8, season: 0.84, recent: 0.83 }, 'corners');
   t(`corners need a measured ${Math.round(C.minChanceStatsOnly * 100)}%`, PK.blockers(c, ctxOk).some((w) => /Measured chance 80%/.test(w)), PK.blockers(c, ctxOk).join(' '));
   t('corners qualify with the measured bar met and every view agreeing', PK.blockers(mk('CH_O4.5', 'Corners', { model: 0.9, season: 0.86, recent: 0.85 }, 'corners'), ctxOk).length === 0, PK.blockers(mk('CH_O4.5', 'Corners', { model: 0.9, season: 0.86, recent: 0.85 }, 'corners'), ctxOk).join(' '));
@@ -398,6 +398,39 @@ console.log('\n10. Measured chances');
   const ml = RS.measuredLine({ key: 'TTA_U1.5', prob: 0.86, raw: 0.84, measured: true, main: 'market' });
   t('reasons quote the measured record of the market', /Measured chance 86%/.test(ml) && /500 past Strongest Picks/.test(ml) && /85\.0% won/.test(ml), ml);
   CAL._reset();
+}
+
+// ------------------------------------------------------------------ 11. the live guard
+console.log('\n11. Live guard: the rule checks itself against its own results');
+{
+  const GUARD = require('../lib/strongest/guard');
+  const dayOf = (i) => new Date(Date.UTC(2026, 0, 1) + i * 86400000).toISOString().slice(0, 10);
+  // n picks at a stated 90%, `won` of them winning, one a day
+  const run = (n, won, o = {}) => Array.from({ length: n }, (_, i) => ({ day: dayOf(i + (o.from || 0)), family: o.family || 'DC', league: o.league || 'eng.1', prob: 0.9, hit: i < won ? 1 : 0 }));
+  const honest = run(100, 90);
+  const g0 = GUARD.evaluate(honest, dayOf(200));
+  t('picks that win what they say are never suspended', Object.keys(g0.families).length === 0 && Object.keys(g0.leagues).length === 0);
+  const bad = run(40, 28); // 70% won at a stated 90%
+  const g1 = GUARD.evaluate(bad, dayOf(41));
+  t('a market that ran far under its chance is suspended, with its numbers', g1.families.DC && g1.families.DC.n >= GUARD.CFG.minPicks && g1.families.DC.won < 0.8 && Math.abs(g1.families.DC.stated - 0.9) < 1e-9, JSON.stringify(g1.families));
+  t('...and so is the league those picks came from', !!g1.leagues['eng.1']);
+  const until = g1.families.DC.until;
+  t(`the suspension lasts ${GUARD.CFG.days} days and then lifts with a clean slate`, !!GUARD.evaluate(bad, new Date(Date.parse(until) - 86400000).toISOString().slice(0, 10)).families.DC && !GUARD.evaluate(bad, until).families.DC);
+  t(`never judged on fewer than ${GUARD.CFG.minPicks} picks`, Object.keys(GUARD.evaluate(run(GUARD.CFG.minPicks - 1, 5), dayOf(60)).families).length === 0);
+  t('picks of today or later are not read (no looking ahead)', Object.keys(GUARD.evaluate(bad, dayOf(5)).families).length === 0);
+  const mixed = [...run(60, 54, { family: 'TT_O0.5', league: 'ger.1' }), ...run(40, 27, { family: 'K_U', league: 'ita.1' })];
+  const g2 = GUARD.evaluate(mixed, dayOf(41));
+  t('only the market that failed is suspended', g2.families.K_U && !g2.families['TT_O0.5'] && g2.leagues['ita.1'] && !g2.leagues['ger.1']);
+  const slight = run(60, 50); // 83% at 90%: z about -1.7, a watch not a suspension
+  const g3 = GUARD.evaluate(slight, dayOf(61));
+  t('a mild shortfall is watched, not suspended', !g3.families.DC && g3.watch.some((w) => w.kind === 'family' && w.name === 'DC'), JSON.stringify(g3.watch));
+  // the pick rules obey it
+  const sel = mk('1X', 'Match', { market: 0.91, stats: 0.9, factors: 0.9 });
+  t('a suspended market gives no pick, and says why', PK.blockers(sel, { ...ctxOk, league: 'ger.1', guard: g1 }).some((w) => /live guard: this market/.test(w)));
+  t('a suspended league gives no pick', PK.blockers(mk('TTH_O0.5', 'Team', { market: 0.91, stats: 0.9 }), { ...ctxOk, league: 'eng.1', guard: g1 }).some((w) => /live guard: this league/.test(w)));
+  t('other markets and leagues carry on', PK.blockers(mk('TTH_O0.5', 'Team', { market: 0.91, stats: 0.9 }), { ...ctxOk, league: 'ger.1', guard: g1 }).length === 0);
+  t('Brazil and Argentina: measured and failed, so no pick', PK.blockers(sel, { ...ctxOk, league: 'bra.1' }).some((w) => /did not hold up/.test(w)) && PK.blockers(sel, { ...ctxOk, league: 'arg.1' }).some((w) => /did not hold up/.test(w)));
+  t('the leagues measured in v7 qualify (MLS, Japan, England 5, Scotland 2)', ['usa.1', 'jpn.1', 'eng.5', 'sco.2'].every((l) => PK.blockers(sel, { ...ctxOk, league: l }).length === 0));
 }
 
 console.log('\n=========================================================');

@@ -162,6 +162,60 @@ const remoteFile = `records/strongest-${ym}.json`;
     PERSIST._reset();
     const bad = await PERSIST.restore();
     t('a bad token is reported, not thrown', !!bad.error && /401/.test(bad.error), JSON.stringify(bad));
+
+    console.log('\n6. No token: the scheduled backup saves, the site reads the public branch');
+    delete process.env.SHARPSHOOTER_RECORDS_TOKEN;
+    delete process.env.SHARPSHOOTER_RECORDS_REPO;
+    PERSIST._reset();
+    t('off without a token or a repository', PERSIST.mode() === 'off' && (await PERSIST.restore()).enabled === false);
+    const exported = PERSIST.exportAll();
+    const expKinds = Object.values(exported.files[`strongest-${ym}.json`] || {}).map((e) => e.kind).sort().join(',');
+    t('the export holds the mirrored entries only (what GET /api/records/export returns)', expKinds === 'pick,pick,slip' && !!exported.generatedAt, expKinds);
+    // the backup tool merges the export into the folder of the records branch
+    const BK = require('../tools/records_backup');
+    const dir = path.join(TMP, 'branch', 'records');
+    const s1 = BK.save(dir, exported);
+    const index = JSON.parse(fs.readFileSync(path.join(dir, 'index.json'), 'utf8'));
+    t('the backup writes the month files and an index', s1.changed && index.files.includes(`strongest-${ym}.json`) && fs.existsSync(path.join(dir, `strongest-${ym}.json`)), JSON.stringify(index));
+    t('the same records again change nothing (no empty commits)', BK.save(dir, exported).changed === false);
+    const wiped = BK.save(dir, { files: { [`strongest-${ym}.json`]: {} } });
+    const kept = JSON.parse(fs.readFileSync(path.join(dir, `strongest-${ym}.json`), 'utf8'));
+    t('a site that has just been wiped does not erase the saved record', wiped.changed === false && Object.keys(kept).length === 3);
+    t('a file name that is not a record is ignored', BK.save(dir, { files: { '../../evil.json': { a: 1 }, 'notes.json': { a: 1 } } }).changed === false && !fs.existsSync(path.join(TMP, 'evil.json')));
+    // the site, restarted on an empty disk, reads the public branch (Render names the repository itself)
+    fs.rmSync(path.join(TMP, 'strongest'), { recursive: true, force: true });
+    process.env.RENDER_GIT_REPO_SLUG = 'me/sharpshooter';
+    PERSIST._reset();
+    const before = GH.calls.length;
+    const prevFetch = global.fetch;
+    const rawCalls = [];
+    global.fetch = async (input, init) => {
+      const u = new URL(String(input));
+      if (u.hostname !== 'raw.githubusercontent.com') return prevFetch(input, init);
+      rawCalls.push(u.pathname);
+      const m = /^\/me\/sharpshooter\/records\/records\/(.+)$/.exec(u.pathname);
+      const file = m ? path.join(dir, m[1]) : null;
+      if (!file || !fs.existsSync(file)) return new Response('404: Not Found', { status: 404 });
+      return new Response(fs.readFileSync(file, 'utf8'), { status: 200 });
+    };
+    t('read mode: a public repository needs no token', PERSIST.mode() === 'read' && PERSIST.status().repo === 'me/sharpshooter' && PERSIST.status().enabled === false);
+    const r2 = await PERSIST.restore();
+    t('the wiped site gets its picks and slip back from the public branch', r2.mode === 'read' && r2.files === 1 && r2.entries === 3 && REC.all().filter((e) => e.kind === 'pick').length === 2, JSON.stringify(r2));
+    t('it read the index and the month file, nothing else', rawCalls.length === 2 && rawCalls[0].endsWith('/index.json'), rawCalls.join(' '));
+    PERSIST.touch('strongest', ym);
+    t('read mode never writes to GitHub (the scheduled backup does)', (await PERSIST.flush()) === 0 && GH.calls.length === before);
+    global.fetch = async () => new Response('404: Not Found', { status: 404 });
+    PERSIST._reset();
+    const none = await PERSIST.restore();
+    t('no saved record yet -> nothing restored, no error', none.files === 0 && !none.error, JSON.stringify(none));
+    delete process.env.RENDER_GIT_REPO_SLUG;
+    PERSIST._reset();
+    t('off the host, no repository is assumed', PERSIST.mode() === 'off');
+    process.env.RENDER = 'true';
+    t('on Render without the variable, package.json names the repository', PERSIST.mode() === 'read' && /^[\w.-]+\/[\w.-]+$/.test(PERSIST.publicRepo()), String(PERSIST.publicRepo()));
+    delete process.env.RENDER;
+    global.fetch = prevFetch;
+    delete process.env.RENDER_GIT_REPO_SLUG;
   } catch (err) {
     t('persist test completed', false, err.stack);
   } finally {
