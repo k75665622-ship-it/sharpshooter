@@ -1,13 +1,13 @@
 {
   "name": "sharpshooter",
-  "version": "7.1.0",
+  "version": "7.2.0",
   "private": true,
   "description": "Football picks with measured chances: a price-anchored engine with 170 measured factors, Strongest Picks in 34 measured leagues with a live guard, safe slips, thirteen market methodologies, and a track record that keeps itself.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "verify": "node test/banker_unit.js && node test/daybook_unit.js && node test/v6_unit.js && node test/v5_unit.js && node test/strongest_unit.js && node test/strongest_record.js && node test/betbuilder_unit.js && node test/persist_unit.js && node test/v7_unit.js && node test/e2e_offline.js && node test_crosscheck.js && node test_consensus_price.js && node test_news.js && node test_quota.js && node test_methodology.js && node test_pricebacktest.js",
+    "verify": "node test/banker_unit.js && node test/daybook_unit.js && node test/v6_unit.js && node test/v5_unit.js && node test/strongest_unit.js && node test/strongest_record.js && node test/betbuilder_unit.js && node test/persist_unit.js && node test/v7_unit.js && node test/traps_unit.js && node test/e2e_offline.js && node test_crosscheck.js && node test_consensus_price.js && node test_news.js && node test_quota.js && node test_methodology.js && node test_pricebacktest.js",
     "test:strongest": "node test/strongest_unit.js && node test/strongest_record.js",
     "test:betbuilder": "node test/betbuilder_unit.js",
     "test:engine": "node test_engine.js",

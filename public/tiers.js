@@ -62,7 +62,7 @@
     return `<button class="tr-row" data-id="${esc(m.id)}" data-league="${esc(m.league)}" data-year="${esc(m.seasonYear || '')}" title="Open the full match analysis">
       <span class="tr-time">${started ? scoreTag(m) : esc(fmtTime(m.date))}</span>
       <span class="tr-match"><b>${esc(m.home.name)} <i>v</i> ${esc(m.away.name)}</b><small>${esc(m.leagueFlag || '')} ${esc(m.leagueName || '')}</small></span>
-      <span class="tr-pick">${esc(p.pick.label)} ${it.outcome ? mark(it.outcome.hit, it.outcome.final) : ''}</span>
+      <span class="tr-pick">${esc(p.pick.label)} ${it.outcome ? mark(it.outcome.hit, it.outcome.final) : ''}${typeof trapLine === 'function' ? trapLine(p.trap, true) : ''}</span>
       <span class="tr-num"><b>${p0(p.prob)}</b><small>fair ${dec(p.fairOdds)}${take}</small></span>
       <span class="tr-st">${statusBadge(p)}</span>
     </button>`;

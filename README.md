@@ -20,6 +20,26 @@ See [`methodology/GENERAL-PREDICTION-v6.md`](methodology/GENERAL-PREDICTION-v6.m
 
 ---
 
+## What's new in v7.2 — the Bookies' Trap scan on every methodology pick
+
+Every methodology pick is now scanned for bookmaker traps ([`lib/traps.js`](lib/traps.js)), following the owner's
+*Bookies' Trap Avoider* protocol: each trap found is rated Minor (-2), Medium (-5) or Major (-10).
+
+- **Clear**: nothing found. **Caution** (above -10): the pick is shown with the trap named.
+  **Trap** (a Major, or several adding up to -10): the pick is withdrawn from Today, is never the Top pick and is
+  never a leg of a methodology slip; the Methodology picks and tiers pages still list it, marked in red.
+- **What it reads**: the engine's market screen (margin, short price, model against market, odds movement, luck
+  against xG, sample size, congestion, thin data), the v6 layer (measured trap rules, "overrated by the price", cup
+  ties, weather), and new checks from the protocol: **T24** false banker (priced as a near-certainty, the numbers
+  disagree), **T9** an Under on a mismatch, **T10** a short double chance with rotation or team news in doubt,
+  **T16** reserve sides, **T18** the first match after a break, **T20** a short favourite in a cup tie, **T32** odds
+  moving hard in a thin market. A slip whose legs are all the same kind of bet says so (T37).
+- **Not covered**: traps that need a human reading (manager quotes, narrative, popularity, derbies, qualification
+  maths). Nothing in the data says them reliably.
+- **Not yet measured.** The new checks follow the protocol's thresholds; they were not replayed on past matches.
+  Each pick's trap score is written to the track record, so the record will show whether flagged picks lose more.
+  The chance of a pick is never changed by the scan.
+
 ## What's new in v7.1 — the methodology on the first screen, and a slip you choose
 
 - **Today leads with the methodology.** The first ticket is the **methodology double**: two picks that pass one of
