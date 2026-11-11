@@ -43,6 +43,15 @@ function todayISO() {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString().slice(0, 10);
 }
 
+/** The Bookies' Trap scan of a methodology pick (lib/traps.js), as one line. Empty when clear. */
+function trapLine(tr, short) {
+  if (!tr || !tr.flags || !tr.flags.length) return '';
+  const bad = tr.verdict === 'trap';
+  const names = tr.flags.slice(0, short ? 1 : 3).map((f) => esc(f.name)).join(', ');
+  const tip = tr.flags.map((f) => `${f.code} ${f.name}${f.detail ? ': ' + f.detail : ''}`).join('\n');
+  return `<span class="trap-tag ${bad ? 'is-trap' : 'is-caution'}" title="${esc(tip)}">${bad ? 'Trap' : 'Caution'}: ${names}</span>`;
+}
+
 function shiftDate(iso, days) {
   const d = new Date(iso + 'T12:00:00Z');
   d.setUTCDate(d.getUTCDate() + days);
@@ -870,6 +879,7 @@ function predCard(item, withMethod) {
     </div>
     <div class="pc-match">${esc(m.home.name)} <span>vs</span> ${esc(m.away.name)}</div>
     <div class="pc-pick">${esc(p.pick.label)} ${item.outcome ? mark(item.outcome.hit, item.outcome.final) : ''}</div>
+    ${trapLine(p.trap)}
     ${item.outcome ? `<div class="pc-res">${scoreTag(m)}</div>` : ''}
     ${withMethod ? `<div class="pc-method">${esc(p.name)} · v${esc(p.version)}</div>` : ''}
     <div class="pc-stats">
@@ -1139,7 +1149,9 @@ function renderTop() {
   const el = $('#board');
   const d = state.preds;
   if (!d) { el.innerHTML = loadingBlock('Selecting the top pick…'); return; }
-  const ranked = d.headline;
+  // a pick the Bookies' Trap scan withdraws is never the top pick (it stays last in the list)
+  const isTrapped = (x) => !!(x.prediction && x.prediction.trap && x.prediction.trap.verdict === 'trap');
+  const ranked = [...d.headline.filter((x) => !isTrapped(x)), ...d.headline.filter(isTrapped)];
   if (!ranked.length) {
     el.innerHTML = `<div class="empty"><h3>No top pick</h3>
       <p>No fixture on ${esc(fmtDateLong(state.date))} qualifies under any methodology.</p></div>`;

@@ -81,7 +81,7 @@
       const sl = started ? pub : live || pub;
       const m = sp.config && sp.config.measured && sp.config.measured.slips && sp.config.measured.slips.safe;
       if (sl) {
-        const legs = sl.legs.map((l) => ({ time: l.kickoff, label: l.label, match: `${l.home} v ${l.away}`, prob: l.prob, hit: l.hit == null ? null : l.hit, final: l.hit != null, result: l.result || null, started: Date.parse(l.kickoff) <= now }));
+        const legs = sl.legs.map((l) => ({ time: l.kickoff, key: l.key, league: l.league, label: l.label, match: `${l.home} v ${l.away}`, prob: l.prob, hit: l.hit == null ? null : l.hit, final: l.hit != null, result: l.result || null, started: Date.parse(l.kickoff) <= now }));
         out.push({
           id: 'safe', name: 'Safe slip', sub: started ? 'Published before the first kick-off and kept as it was.' : `The ${legs.length} strongest picks of the day. Short odds, lands most often.`,
           legs, prob: sl.prob, odds: sl.fairOdds, real: false, takeAt: sl.fairOdds, landed: m && m.landed, landedN: m && m.n, state: stateOf(legs, sl.hit), view: 'strongest',
@@ -94,7 +94,7 @@
       const op = acc && (acc.options || []).find((o) => o.size === size);
       if (!op || !op.legs || !op.legs.length) continue;
       const legs = op.legs.map((l) => ({
-        time: l.kickoff, label: l.label, match: `${l.home} v ${l.away}`, prob: l.prob, method: l.methodology && l.methodology.name,
+        time: l.kickoff, key: l.key, league: l.league, label: l.label, match: `${l.home} v ${l.away}`, prob: l.prob, method: l.methodology && l.methodology.name,
         hit: l.outcome && l.outcome.final ? l.outcome.hit : null, final: !!(l.outcome && l.outcome.final), started: Date.parse(l.kickoff) <= now,
       }));
       out.push({
@@ -110,7 +110,7 @@
     for (const [sl, id, m] of [[bk && bk.safer, 'banker2', h && h.safer], [bk && bk.slip, 'banker3', h && h.slip]]) {
       if (!sl || !sl.legs || !sl.legs.length) continue;
       const legs = sl.legs.map((l) => ({
-        time: l.kickoff, label: l.label, match: `${l.home} v ${l.away}`, prob: l.prob,
+        time: l.kickoff, key: l.key, league: l.league, label: l.label, match: `${l.home} v ${l.away}`, prob: l.prob,
         hit: l.outcome && l.outcome.final ? l.outcome.hit : null, final: !!(l.outcome && l.outcome.final), started: Date.parse(l.kickoff) <= now,
       }));
       const target = id === 'banker2' ? (sl.target || 2) : (bk.target || 3);
@@ -155,6 +155,17 @@
     return `<p class="tk-verdict bad"><b>Too low — skip it.</b> At ${dec(o)} you lose money over time: this slip needs ${even} just to break even, and ${dec(sl.takeAt)} to be worth taking.</p>`;
   }
 
+  /** A slip whose legs all rest on one reading (the trap protocol's "shared assumption"): one sentence, or ''. */
+  function slipNote(legs) {
+    if (!legs || legs.length < 2) return '';
+    const fam = (k) => (k ? String(k).replace(/^TT[HA]_/, 'TT_').replace(/^(1X|X2)$/, 'DC').replace(/^(1|2)$/, 'WIN').replace(/^DNB_[HA]$/, 'DNB') : null);
+    const fams = new Set(legs.map((l) => fam(l.key)));
+    const leagues = new Set(legs.map((l) => l.league || null));
+    if (fams.size === 1 && !fams.has(null)) return 'Every leg is the same kind of bet: if that reading is wrong, they all fail together.';
+    if (legs.length >= 3 && leagues.size === 1 && !leagues.has(null)) return 'Every leg is from the same competition: one odd round can sink them all.';
+    return '';
+  }
+
   function ticket(sl, sp) {
     if (!sl) {
       const one = sp && (sp.picks || []).length === 1 ? sp.picks[0] : null;
@@ -178,6 +189,7 @@
         <div class="ticket-chance"><b>${p0(sl.prob)}</b><span>chance all ${sl.legs.length} win</span></div>
       </header>
       <ol class="ticket-legs">${legs}</ol>
+      ${!started && slipNote(sl.legs) ? `<p class="ticket-note">${esc(slipNote(sl.legs))}</p>` : ''}
       <footer class="ticket-foot">
         <div><span>${sl.real ? 'Best odds seen' : 'Fair odds'}</span><b>${dec(sl.odds)}</b></div>
         ${sl.landed != null ? `<div><span>Slips like this landed</span><b>${pct(sl.landed, 0)}${sl.landedN ? ` <small>of ${Number(sl.landedN).toLocaleString('en-GB')} days</small>` : ''}</b></div>` : ''}
@@ -212,31 +224,34 @@
     const acc = pr.accumulator || {};
     const confirmed = (acc.legs || []).map((l) => ({
       id: l.fixtureId, league: l.league, time: l.kickoff, label: l.label, match: `${l.home} v ${l.away}`, method: l.methodology && l.methodology.name,
-      prob: l.prob, best: l.best || null, confirmed: true, outcome: l.outcome || null,
+      prob: l.prob, best: l.best || null, confirmed: true, outcome: l.outcome || null, trap: l.trap || null,
     }));
     const seen = new Set(confirmed.map((c) => String(c.id)));
-    const rest = (pr.headline || [])
-      .filter((h) => h.prediction && ['LOCK', 'PREDICT'].includes(h.prediction.status) && !seen.has(String(h.match.id)))
+    const passing = (pr.headline || []).filter((h) => h.prediction && ['LOCK', 'PREDICT'].includes(h.prediction.status) && !seen.has(String(h.match.id)));
+    const isTrap = (h) => !!(h.prediction.trap && h.prediction.trap.verdict === 'trap');
+    const withdrawn = passing.filter(isTrap).length;
+    const rest = passing
+      .filter((h) => !isTrap(h))
       .map((h) => ({
         id: h.match.id, league: h.match.league, time: h.match.date, label: h.prediction.pick.label, match: `${h.match.home.name} v ${h.match.away.name}`, method: h.prediction.name,
-        prob: h.prediction.prob, best: h.prediction.price && h.prediction.price.best ? h.prediction.price.best.price || h.prediction.price.best : null, confirmed: false, outcome: h.outcome || null,
+        prob: h.prediction.prob, best: h.prediction.price && h.prediction.price.best ? h.prediction.price.best.price || h.prediction.price.best : null, confirmed: false, outcome: h.outcome || null, trap: h.prediction.trap || null,
       }));
     const all = [...confirmed.sort((a, b) => b.prob - a.prob), ...rest.sort((a, b) => b.prob - a.prob)];
     if (!all.length) {
       return `<section class="td-block"><h3>Methodology picks</h3>
-        <p class="td-note">No match ${state.date === todayISO() ? 'today' : 'on this day'} passes a methodology. The thirteen methodologies only speak when their rules are met.</p>
+        <p class="td-note">${withdrawn ? `${withdrawn} pick${withdrawn === 1 ? '' : 's'} passed a methodology but the trap scan withdrew ${withdrawn === 1 ? 'it' : 'them'}.` : `No match ${state.date === todayISO() ? 'today' : 'on this day'} passes a methodology. The thirteen methodologies only speak when their rules are met.`}</p>
         <button class="btn btn-quiet" data-view="method">Read the methodology rules</button></section>`;
     }
     const mark = (o) => (o && o.final ? (o.hit === 1 ? '<b class="pos" aria-label="won">✓</b>' : o.hit === 0 ? '<b class="neg" aria-label="lost">✕</b>' : '') : '');
     const rows = all.slice(0, 6).map((it) => `<li><button class="td-pick td-pick-m" data-id="${esc(it.id)}" data-league="${esc(it.league)}" data-year="">
         <span class="tk-t">${esc(fmtTime(it.time))}</span>
-        <span class="tk-l"><b>${esc(it.label)}</b><small>${esc(it.match)} · ${esc(it.method || '')}${it.confirmed ? '<em class="td-tag">double-confirmed</em>' : ''}</small></span>
+        <span class="tk-l"><b>${esc(it.label)}</b><small>${esc(it.match)} · ${esc(it.method || '')}${it.confirmed ? '<em class="td-tag">double-confirmed</em>' : ''}</small>${typeof trapLine === 'function' ? trapLine(it.trap, true) : ''}</span>
         <span class="tk-p">${mark(it.outcome) || `<span>${p0(it.prob)}</span>`}${typeof it.best === 'number' && it.best > 1 ? `<small class="tk-odds">odds ${dec(it.best)}</small>` : ''}</span>
       </button></li>`).join('');
     return `<section class="td-block">
       <h3>Methodology picks</h3>
       <ol class="td-picks">${rows}</ol>
-      <p class="td-note">${all.length} match${all.length === 1 ? '' : 'es'} pass a methodology${confirmed.length ? `; ${confirmed.length} ${confirmed.length === 1 ? 'is' : 'are'} <b>double-confirmed</b> (the normal prediction backs the same pick). On past matches double-confirmed picks won 72.5%, the ones the normal prediction disagreed with 66.6%.` : '.'}</p>
+      <p class="td-note">${all.length} match${all.length === 1 ? '' : 'es'} pass a methodology${confirmed.length ? `; ${confirmed.length} ${confirmed.length === 1 ? 'is' : 'are'} <b>double-confirmed</b> (the normal prediction backs the same pick). On past matches double-confirmed picks won 72.5%, the ones the normal prediction disagreed with 66.6%.` : '.'}${withdrawn ? ` <b>${withdrawn} more ${withdrawn === 1 ? 'was' : 'were'} withdrawn by the trap scan</b> (see Methodology picks).` : ''}</p>
       <button class="btn btn-quiet" data-view="predictions">All methodology picks</button>
     </section>`;
   }

@@ -339,6 +339,7 @@ global.fetch = async (input, init) => {
     t('predictions list methods with counts', Array.isArray(preds.methods) && preds.methods.length === 13);
     t('predictions carry the double-confirmed accumulator', preds.accumulator && Array.isArray(preds.accumulator.legs) && Array.isArray(preds.accumulator.options) && preds.accumulator.rules.length >= 3, JSON.stringify(preds.accumulator && { legs: preds.accumulator.legs.length, err: preds.accumulator.error }));
     t('predictions carry what became of the last days\' slips', Array.isArray(preds.slipHistory) && preds.slipHistory.every((d) => /^\d{4}-\d{2}-\d{2}$/.test(d.day)), JSON.stringify(preds.slipHistory).slice(0, 200));
+    t('every methodology pick of the day carries its trap scan', Object.values(preds.byMethod).flat().every((it) => it.prediction.trap && ['clear', 'caution', 'trap'].includes(it.prediction.trap.verdict) && Array.isArray(it.prediction.trap.flags)), JSON.stringify(Object.values(preds.byMethod).flat().map((it) => it.prediction.trap && it.prediction.trap.verdict)).slice(0, 200));
     t('every accumulator leg passed a methodology AND the normal prediction', (preds.accumulator.legs || []).every((l) => ['LOCK', 'PREDICT'].includes(l.methodology.status) && ['main', 'call', 'safer'].includes(l.agreement)));
     const acc = (await get(`/api/accumulator?date=${day}`)).body;
     t('accumulator endpoint', acc.accumulator && Array.isArray(acc.accumulator.options), JSON.stringify(acc).slice(0, 200));
